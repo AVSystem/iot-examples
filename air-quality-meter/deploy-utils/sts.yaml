@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: airquality
+  name: air-quality-meter-example
   labels:
-    role: airquality
+    role: air-quality-meter-example
 spec:
-  serviceName: airquality
+  serviceName: air-quality-meter-example
   replicas: 1
   selector:
     matchLabels:
-      role: airquality
+      role: air-quality-meter-example
   template:
     metadata:
       labels:
-        role: airquality
+        role: air-quality-meter-example
     spec:
       containers:
-        - name: airquality
-          image: repository.avsystem.com/docker-local/airquality
+        - name: air-quality-meter-example
+          image: avsystemcom/air-quality-meter-example
           imagePullPolicy: Always
           resources:
             limits:

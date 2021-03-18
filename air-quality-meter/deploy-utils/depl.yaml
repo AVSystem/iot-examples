@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: airquality
-          image: repository.avsystem.com/docker-local/airquality
+          image: avsystemcom/air-quality-meter-example
           imagePullPolicy: Always
           resources:
             limits:
