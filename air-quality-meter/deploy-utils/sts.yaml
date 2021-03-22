@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: air-quality-meter-example
+  labels:
+    role: air-quality-meter-example
+spec:
+  serviceName: air-quality-meter-example
+  replicas: 1
+  selector:
+    matchLabels:
+      role: air-quality-meter-example
+  template:
+    metadata:
+      labels:
+        role: air-quality-meter-example
+    spec:
+      containers:
+        - name: air-quality-meter-example
+          image: avsystemcom/air-quality-meter-example
+          imagePullPolicy: Always
+          resources:
+            limits:
+              memory: "150Mi"
+              cpu: "200m"
+          env:
+            - name: DEVICEID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVER_ADDRESS
+              #value: "xxx"
+              value: "xxx"
+            - name: OPEN_WEATHER_API_TOKEN
+              value: "xxx"
