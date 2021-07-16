@@ -27,3 +27,7 @@ air-quality-meter/.gradle
 air-quality-meter/build
 .idea
 iot-examples.iml
+
+coiote-aws-iot-terraform/terraform.tfstate
+coiote-aws-iot-terraform/terraform.tfstate.backup
+coiote-aws-iot-terraform/.terraform
