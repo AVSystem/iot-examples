@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: airquality
+  name: AIR_QUALITY_METER
   labels:
     role: airquality
 spec:
@@ -27,8 +27,21 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: IDENTITY
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KEY
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVER_PORT
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: SERVER_ADDRESS
-              #value: "xxx"
-              value: "xxx"
+              value: "127.0.0.1"
             - name: OPEN_WEATHER_API_TOKEN
-              value: "xxx"
+              value: "xxxx"
+            - name: SERVER_PROTOCOL
+              value: "coaps"

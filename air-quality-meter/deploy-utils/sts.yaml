@@ -6,6 +6,7 @@ metadata:
     role: air-quality-meter-example
 spec:
   serviceName: air-quality-meter-example
+  podManagementPolicy: Parallel
   replicas: 1
   selector:
     matchLabels:
@@ -17,7 +18,7 @@ spec:
     spec:
       containers:
         - name: air-quality-meter-example
-          image: avsystemcom/air-quality-meter-example
+          image: repository.avsystem.com/docker-local/air-quality-meter-example-psk
           imagePullPolicy: Always
           resources:
             limits:
@@ -28,8 +29,19 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: IDENTITY
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KEY
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVER_PORT
+              value: "6684"
             - name: SERVER_ADDRESS
-              #value: "xxx"
               value: "xxx"
             - name: OPEN_WEATHER_API_TOKEN
               value: "xxx"
+            - name: SERVER_PROTOCOL
+              value: "coaps"
