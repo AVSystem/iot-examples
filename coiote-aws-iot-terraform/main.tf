@@ -25,7 +25,7 @@ EOF
         {
           "Sid": "GetSecrets",
           "Action": "secretsmanager:GetSecretValue",
-          "Resource": "*",
+          "Resource": "arn:aws:secretsmanager:*:*:secret:coioteDMrest-??????",
           "Effect": "Allow"
         }
       ]
