@@ -38,9 +38,9 @@ def getCoioteSecrets():
 
     if expectedKeysSet.issubset(fetchedKeysSet):
         return CoioteCredentials(
-            url=secretsMap['url'],
-            username=secretsMap['username'],
-            password=secretsMap['password']
+            url=secretsMap[urlKey],
+            username=secretsMap[usernameKey],
+            password=secretsMap[passwordKey]
         )
     else:
         raise Exception(f'Secret in Secrets Manager does not have all required keys ({", ".join(expectedKeysSet)})')
