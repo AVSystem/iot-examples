@@ -25,7 +25,23 @@
                 {
                   "Sid": "GetSecrets",
                   "Action": "secretsmanager:GetSecretValue",
-                  "Resource": "arn:aws:secretsmanager:*:*:secret:coioteDMrest-??????",
+                  "Resource": {
+                    "Fn::Join": [
+                      ":", [
+                        "arn",
+                        "aws",
+                        "secretsmanager",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "secret",
+                        "coioteDMrest-??????"
+                      ]
+                    ]
+                  },
                   "Effect": "Allow"
                 }
               ]
