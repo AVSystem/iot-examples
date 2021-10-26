@@ -1,10 +1,53 @@
-import os
-#import json
+import json
 import requests
+import boto3
+from dataclasses import dataclass
+
+
+@dataclass
+class CoioteCredentials:
+    url: str
+    username: str
+    password: str
+
+
+def getCoioteSecrets():
+    secretName = "coioteDMrest"
+
+    session = boto3.session.Session()
+    client = session.client('secretsmanager')
+
+    try:
+        getSecretValueResponse = client.get_secret_value(
+            SecretId=secretName
+        )
+    except Exception:
+        raise Exception('Coiote DM credentials not found in Secrets Manager')
+
+    if 'SecretString' not in getSecretValueResponse:
+        raise Exception('Coiote DM credentials are not set up correctly')
+
+    secretsMap = json.JSONDecoder().decode(getSecretValueResponse['SecretString'])
+
+    usernameKey = 'username'
+    passwordKey = 'password'
+    urlKey = 'url'
+
+    expectedKeysSet = {usernameKey, passwordKey, urlKey}
+    fetchedKeysSet = set(secretsMap.keys())
+
+    if expectedKeysSet.issubset(fetchedKeysSet):
+        return CoioteCredentials(
+            url=secretsMap[urlKey],
+            username=secretsMap[usernameKey],
+            password=secretsMap[passwordKey]
+        )
+    else:
+        raise Exception(f'Secret in Secrets Manager does not have all required keys ({", ".join(expectedKeysSet)})')
+
 
 def lambda_handler(event, context):
-
-    if not 'keys' in event:
+    if 'keys' not in event:
         #Results of print functions are logged in CloudWatch when debugging is enabled
         #Results of return seem to be not logged there
         print('Error: keys must be specified')
@@ -85,7 +128,7 @@ def lambda_handler(event, context):
             #valuesCsStr = ','.join(values)
             valuesCsStr = ','.join([str(x) for x in values])
             body='{"templateName":"AWSwrite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"values","value":"'+valuesCsStr+'"}]}}'
-                
+
         elif operation == 'read':
             keysCsStr = pathsOptimization(keys)
             body='{"templateName":"AWSread","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
@@ -176,7 +219,7 @@ def lambda_handler(event, context):
                 keys = list(set(keys))
                 keysCsStr = ','.join(keys)
             body='{"templateName":"AWScancelObserve","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
-            
+
         elif operation == 'cancelObserveComposite':
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
@@ -224,9 +267,14 @@ def lambda_handler(event, context):
                 'body': '{"error":"operation '+operation+' is not implemented for AWS-CoioteDM integration"}'
             }
 
-        user=os.environ['coioteDMrestUsername']
-        password=os.environ['coioteDMrestPassword']
-        restUri=os.environ['coioteDMrestUri']
+        try:
+            credentials = getCoioteSecrets()
+        except Exception as ex:
+            print('Error: ' + str(ex))
+            return {
+                'statusCode': 400,
+                'body': '{"error":"' + str(ex) + '"}'
+            }
         #uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/deviceBlocking/'+thingName
         """
         in this approach, the task is scheduled at Coiote - and then we are performing 2nd call to trigger session even if a device is deregistered
@@ -235,24 +283,24 @@ def lambda_handler(event, context):
         we can also add an optional parameter in the shadow to wait for a device (by default set to false) and in this case not performing 2nd call triggering session
         If instead these 2 the method commented above is used, Coiote will respond with error indicating that the device is deregistered and the task will not be scheduled at all
         """
-        uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/device/'+thingName
-        headers={'Content-Type':'application/json'}
-        apiCallResp = requests.post(uri,data=body,headers=headers,auth=(user,password))
-        qjResponseCode=apiCallResp.status_code
-        qjResponseBody=apiCallResp.text
+        uri = credentials.url+'/api/coiotedm/v3/tasksFromTemplates/device/'+thingName
+        headers = {'Content-Type':'application/json'}
+        apiCallResp = requests.post(uri, data=body, headers=headers, auth=(credentials.username, credentials.password))
+        qjResponseCode = apiCallResp.status_code
+        qjResponseBody = apiCallResp.text
         if qjResponseCode != 201:
-            print('Error: Coiote DM responded with: '+str(qjResponseCode)+': '+qjResponseBody)
+            print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
             return {
                 'statusCode': qjResponseCode,
                 'body': qjResponseBody
             }
 
-        uri=restUri+'/api/coiotedm/v3/sessions/'+thingName+'/allow-deregistered'
-        apiCallResp = requests.post(uri,auth=(user,password))
-        qjResponseCode=apiCallResp.status_code
-        qjResponseBody=apiCallResp.text
+        uri = credentials.url+'/api/coiotedm/v3/sessions/'+thingName+'/allow-deregistered'
+        apiCallResp = requests.post(uri, auth=(credentials.username, credentials.password))
+        qjResponseCode = apiCallResp.status_code
+        qjResponseBody = apiCallResp.text
         if qjResponseCode != 200:
-            print('Error: Coiote DM responded with: '+str(qjResponseCode)+': '+qjResponseBody)
+            print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
 
         return {
             'statusCode': qjResponseCode,
