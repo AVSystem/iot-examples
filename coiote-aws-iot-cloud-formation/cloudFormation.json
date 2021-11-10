@@ -292,6 +292,99 @@
           }
         }
       }
+    },
+    "CertificateLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "CloudWatchLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:*",
+                    "iot:*"
+                  ],
+                  "Resource": "*",
+                  "Effect": "Allow"
+                }
+              ]
+            }
+          }
+        ],
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ]
+      }
+    },
+    "CertificateLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "CertificateLambda",
+        "Code": "certificates/",
+        "Runtime": "python3.8",
+        "Handler": "certificates.handler",
+        "Timeout": 60,
+        "Role": {
+          "Fn::GetAtt": [
+            "CertificateLambdaRole",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "CustomResource": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CertificateLambda",
+            "Arn"
+          ]
+        }
+      }
+    }
+  },
+  "Parameters":{
+    "coioteDMrestUri": {
+      "Description": "Coiote DM REST URL - ex. https://lwm2m-test.avsystem.io:8087",
+      "Type": "String",
+      "Default": "https://lwm2m-test.avsystem.io:8087"
+    },
+    "coioteDMrestPassword": {
+      "Description": "Coiote DM REST User Password",
+      "Type": "String",
+      "Default": "password"
+    },
+    "coioteDMrestUsername": {
+      "Description": "Coiote DM REST User Username",
+      "Type": "String",
+      "Default": "login"
+    },
+    "coioteDMrestDomainId": {
+      "Description": "Coiote DM REST Domain ID",
+      "Type": "String",
+      "Default": "domain"
+    },
+    "coioteDMrestGroupId": {
+      "Description": "Coiote DM REST Group ID",
+      "Type": "String",
+      "Default": "group"
     }
   }
 }
