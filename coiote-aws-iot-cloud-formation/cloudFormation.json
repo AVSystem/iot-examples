@@ -345,10 +345,29 @@
             "CertificateLambdaRole",
             "Arn"
           ]
+        },
+        "Environment": {
+          "Variables": {
+            "coioteDMrestUri": {
+              "Ref": "coioteDMrestUri"
+            },
+            "coioteDMrestPassword": {
+              "Ref": "coioteDMrestPassword"
+            },
+            "coioteDMrestUsername": {
+              "Ref": "coioteDMrestUsername"
+            },
+            "coioteDMrestDomainId": {
+              "Ref": "coioteDMrestDomainId"
+            },
+            "coioteDMrestGroupId": {
+              "Ref": "coioteDMrestGroupId"
+            }
+          }
         }
       }
     },
-    "CustomResource": {
+    "CertificateCustomResource": {
       "Type": "AWS::CloudFormation::CustomResource",
       "Properties": {
         "ServiceToken": {

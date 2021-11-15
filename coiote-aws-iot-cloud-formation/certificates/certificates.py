@@ -25,16 +25,11 @@ def create(event, context):
     ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
     internal_cert_ca = ca_result.content.decode('UTF-8')
 
-    body_str = '{"domainId": "{domain_id}","groupId": "{group_id}","username": "{user}","internalCertificate": {' \
-               '"certificatePem": "{internal_cert_pem}","privateKey": "{internal_cert_key}", "certificateAuthority": ' \
-               '"{internal_cert_ca}"},"externalCertificate": {"certificatePem": "{external_cert_pem}"}} '
-    body = body_str.format(
-        domain_id=domain_id, group_id=group_id, user=user,
-        internal_cert_pem=internal_certificate['certificatePem'],
-        internal_cert_key=internal_certificate['keyPair']['PrivateKey'],
-        internal_cert_ca=internal_cert_ca,
-        external_cert_pem=external_certificate['certificatePem']
-    )
+    body = '{"domainId": "' + domain_id + '","groupId": "' + group_id + '","username": "' + user + \
+        '","internalCertificate": {"certificatePem": "' + internal_certificate['certificatePem'] + \
+        '","privateKey": "' + internal_certificate['keyPair']['PrivateKey'] + '", "certificateAuthority": "' + \
+        internal_cert_ca + '"},"externalCertificate": {"certificatePem": "' + \
+        external_certificate['certificatePem'] + '"}} '
 
     uri = rest_uri + '/api/coiotedm/v3/certificates/saveTwoWayCertificates'
     headers = {'Content-Type': 'application/json'}
@@ -84,8 +79,11 @@ def save_certificate_in_secret_manager(external_certificate):
 
 @helper.delete
 def delete(event, context):
-    delete_certificates_from_coiote()
-    delete_certificates_from_aws()
+    try:
+        delete_certificates_from_coiote()
+        delete_certificates_from_aws()
+    except Exception:
+        pass
 
 
 def delete_certificates_from_coiote():
