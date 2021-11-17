@@ -2,12 +2,11 @@ import json
 import os
 from typing import TypedDict
 
-from requests import Response
-
 import boto3
 import requests
-from crhelper import CfnResource
 from OpenSSL import crypto
+from crhelper import CfnResource
+from requests import Response
 
 
 class Certificate(TypedDict):
