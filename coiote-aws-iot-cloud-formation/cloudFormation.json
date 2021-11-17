@@ -311,16 +311,96 @@
         "Path": "/",
         "Policies": [
           {
-            "PolicyName": "CloudWatchLogs",
+            "PolicyName": "CloudWatchForCertificatesLambdaPolicy",
             "PolicyDocument": {
               "Version": "2012-10-17",
               "Statement": [
                 {
                   "Action": [
-                    "logs:*",
-                    "iot:*"
+                    "logs:PutLogEvents",
+                    "logs:CreateLogStream"
                   ],
-                  "Resource": "*",
+                  "Resource": {
+                    "Fn::Join": [
+                      ":", [
+                        "arn",
+                        "aws",
+                        "logs",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "log-group",
+                        "/AWSIotLogsV2/*"
+                      ]
+                    ]
+                  },
+                  "Effect": "Allow"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "IoTForCertificatesLambdaPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "iot:CreateKeysAndCertificate"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      ":", [
+                        "arn",
+                        "aws",
+                        "iot",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "cert/*"
+                      ]
+                    ]
+                  },
+                  "Effect": "Allow"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "SecretsManagerForCertificatesLambdaPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "GetSecrets",
+                  "Action": [
+                    "secretsmanager:CreateSecret",
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:PutSecretValue"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      ":", [
+                        "arn",
+                        "aws",
+                        "secretsmanager",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "secret",
+                        "coioteDMcert-??????"
+                      ]
+                    ]
+                  },
                   "Effect": "Allow"
                 }
               ]
@@ -382,28 +462,23 @@
   "Parameters":{
     "coioteDMrestUri": {
       "Description": "Coiote DM REST URL - ex. https://lwm2m-test.avsystem.io:8087",
-      "Type": "String",
-      "Default": "https://lwm2m-test.avsystem.io:8087"
+      "Type": "String"
     },
     "coioteDMrestPassword": {
       "Description": "Coiote DM REST User Password",
-      "Type": "String",
-      "Default": "password"
+      "Type": "String"
     },
     "coioteDMrestUsername": {
       "Description": "Coiote DM REST User Username",
-      "Type": "String",
-      "Default": "login"
+      "Type": "String"
     },
     "coioteDMrestDomainId": {
       "Description": "Coiote DM REST Domain ID",
-      "Type": "String",
-      "Default": "domain"
+      "Type": "String"
     },
     "coioteDMrestGroupId": {
       "Description": "Coiote DM REST Group ID",
-      "Type": "String",
-      "Default": "group"
+      "Type": "String"
     }
   }
 }

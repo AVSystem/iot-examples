@@ -13,8 +13,9 @@ secrets_manager_client = boto3.client('secretsmanager')
 user = os.environ['coioteDMrestUsername']
 password = os.environ['coioteDMrestPassword']
 rest_uri = os.environ['coioteDMrestUri']
-domain_id = os.environ['coioteDMrestDomainId']
 group_id = os.environ['coioteDMrestGroupId']
+
+secret_name = 'coioteDMcert'
 
 
 @helper.create
@@ -25,26 +26,18 @@ def create(event, context):
     ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
     internal_cert_ca = ca_result.content.decode('UTF-8')
 
-    body = '{"domainId": "' + domain_id + '","groupId": "' + group_id + '","username": "' + user + \
-        '","internalCertificate": {"certificatePem": "' + internal_certificate['certificatePem'] + \
-        '","privateKey": "' + internal_certificate['keyPair']['PrivateKey'] + '", "certificateAuthority": "' + \
-        internal_cert_ca + '"},"externalCertificate": {"certificatePem": "' + \
-        external_certificate['certificatePem'] + '"}} '
+    send_internal_certificate(internal_certificate, internal_cert_ca)
 
-    uri = rest_uri + '/api/coiotedm/v3/certificates/saveTwoWayCertificates'
-    headers = {'Content-Type': 'application/json'}
-    api_call_resp = requests.post(uri, data=body, headers=headers, auth=(user, password))
+    send_external_certificate(external_certificate)
 
     try:
         save_certificate_in_secret_manager(external_certificate)
     except secrets_manager_client.exceptions.ResourceExistsException:
-        delete_certificates_from_coiote()
-
-    print(api_call_resp.content)
-    print(api_call_resp.status_code)
+        delete_internal_certificate()
+        delete_external_certificate()
 
 
-def generate_external_cert(email_address, common_name, serial_number=0):
+def generate_external_cert(email_address: str, common_name: str, serial_number=0) -> dict:
     # can look at generated file using openssl:
     # openssl x509 -inform pem -in selfsigned.crt -noout -text
     # create a key pair
@@ -52,11 +45,12 @@ def generate_external_cert(email_address, common_name, serial_number=0):
     k.generate_key(crypto.TYPE_RSA, 4096)
     # create a self-signed cert
     cert = crypto.X509()
-    cert.get_subject().C = 'PL'
-    cert.get_subject().ST = 'Lesser Poland'
-    cert.get_subject().L = 'Cracow'
-    cert.get_subject().O = 'AVSYSTEM'
-    cert.get_subject().OU = 'AVSYSTEM'
+    cert.get_issuer().C = 'PL'
+    cert.get_issuer().ST = 'Lesser Poland'
+    cert.get_issuer().L = 'Cracow'
+    cert.get_issuer().O = 'AVSystem'
+    cert.get_issuer().OU = 'AVSystem'
+    cert.get_issuer().CN = 'AVSystem'
     cert.get_subject().CN = common_name
     cert.get_subject().emailAddress = email_address
     cert.set_serial_number(serial_number)
@@ -72,30 +66,58 @@ def generate_external_cert(email_address, common_name, serial_number=0):
     }
 
 
+def send_internal_certificate(internal_certificate, internal_cert_ca):
+
+    request_body = {
+        'certificateAuthority': internal_cert_ca,
+        'certificatePem': internal_certificate['certificatePem'],
+        'privateKey': internal_certificate['keyPair']['PrivateKey']
+    }
+
+    uri = rest_uri + '/api/coiotedm/v3/awsIntegration/auth/internalCertificate/' + group_id
+    headers = {'Content-Type': 'application/json'}
+    return requests.post(uri, data=json.dumps(request_body), headers=headers, auth=(user, password))
+
+
+def send_external_certificate(external_certificate):
+    request_body = {
+        'certificatePem': external_certificate['certificatePem']
+    }
+
+    uri = rest_uri + '/api/coiotedm/v3//auth/certificates'
+    headers = {'Content-Type': 'application/json'}
+    return requests.post(uri, data=json.dumps(request_body), headers=headers, auth=(user, password))
+
+
 def save_certificate_in_secret_manager(external_certificate):
-    secrets_manager_client.create_secret(Name='coioteDMcert')
-    secrets_manager_client.put_secret_value(SecretId='coioteDMcert', SecretString=json.dumps(external_certificate))
+    secrets_manager_client.create_secret(Name=secret_name)
+    secrets_manager_client.put_secret_value(SecretId=secret_name, SecretString=json.dumps(external_certificate))
 
 
 @helper.delete
 def delete(event, context):
     try:
-        delete_certificates_from_coiote()
+        delete_internal_certificate()
+        delete_external_certificate()
         delete_certificates_from_aws()
     except Exception:
         pass
 
 
-def delete_certificates_from_coiote():
-    uri = rest_uri + '/api/coiotedm/v3/certificates/deleteTwoWayCertificates/' + group_id
+def delete_internal_certificate():
+    uri = rest_uri + '/api/coiotedm/v3/awsIntegration/auth/internalCertificate/' + group_id
     headers = {'Content-Type': 'application/json'}
-    api_call_resp = requests.delete(uri, headers=headers, auth=(user, password))
-    print(api_call_resp.content)
-    print(api_call_resp.status_code)
+    return requests.delete(uri, data=json.dumps({}), headers=headers, auth=(user, password))
+
+
+def delete_external_certificate():
+    uri = rest_uri + '/api/coiotedm/v3//auth/certificates/' + user
+    headers = {'Content-Type': 'application/json'}
+    return requests.post(uri, data=json.dumps({}), headers=headers, auth=(user, password))
 
 
 def delete_certificates_from_aws():
-    secrets_manager_client.delete_secret(Name='coioteDMcert')
+    secrets_manager_client.delete_secret(Name=secret_name)
 
 
 def handler(event, context):
