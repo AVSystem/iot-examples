@@ -90,7 +90,7 @@ def send_internal_certificate(internal_certificate, internal_cert_ca) -> Respons
     }
 
     uri = rest_uri + '/awsIntegration/auth/internalCertificate/' + group_id
-    return requests.post(uri, data=request_body, auth=(user, password))
+    return requests.post(uri, json=request_body, auth=(user, password))
 
 
 def save_internal_certificate_data(internal_certificate):
@@ -105,7 +105,7 @@ def send_external_certificate(external_certificate: Certificate) -> Response:
     }
 
     uri = rest_uri + '/auth/certificates'
-    return requests.post(uri, data=request_body, auth=(user, password))
+    return requests.post(uri, json=request_body, auth=(user, password))
 
 
 def save_certificate_in_secret_manager(external_certificate: Certificate):
