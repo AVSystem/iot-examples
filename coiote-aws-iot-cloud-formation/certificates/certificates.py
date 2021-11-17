@@ -70,9 +70,8 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
     cert.set_serial_number(serial_number)
     cert.gmtime_adj_notBefore(0)
     cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
-    cert.set_issuer(cert.get_subject())
     cert.set_pubkey(k)
-    cert.sign(k, b'sha256')
+    cert.sign(k, 'sha256')
 
     return {
         'certificatePem': crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8"),
