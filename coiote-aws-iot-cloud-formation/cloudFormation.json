@@ -349,7 +349,10 @@
               "Statement": [
                 {
                   "Action": [
-                    "iot:CreateKeysAndCertificate"
+                    "iot:CreateKeysAndCertificate",
+                    "iot: DetachPolicy",
+                    "iot:UpdateCertificate",
+                    "iot:DeleteCertificate"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -382,25 +385,45 @@
                   "Action": [
                     "secretsmanager:CreateSecret",
                     "secretsmanager:DeleteSecret",
-                    "secretsmanager:PutSecretValue"
+                    "secretsmanager:PutSecretValue",
+                    "secretsmanager:GetSecretValue"
                   ],
-                  "Resource": {
-                    "Fn::Join": [
-                      ":", [
-                        "arn",
-                        "aws",
-                        "secretsmanager",
-                        {
-                          "Ref": "AWS::Region"
-                        },
-                        {
-                          "Ref": "AWS::AccountId"
-                        },
-                        "secret",
-                        "coioteDMcert-??????"
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        ":", [
+                          "arn",
+                          "aws",
+                          "secretsmanager",
+                          {
+                            "Ref": "AWS::Region"
+                          },
+                          {
+                            "Ref": "AWS::AccountId"
+                          },
+                          "secret",
+                          "coioteDMcert-??????"
+                        ]
                       ]
-                    ]
-                  },
+                    },
+                    {
+                      "Fn::Join": [
+                        ":", [
+                          "arn",
+                          "aws",
+                          "secretsmanager",
+                          {
+                            "Ref": "AWS::Region"
+                          },
+                          {
+                            "Ref": "AWS::AccountId"
+                          },
+                          "secret",
+                          "coioteDMcertData-??????"
+                        ]
+                      ]
+                    }
+                  ],
                   "Effect": "Allow"
                 }
               ]
