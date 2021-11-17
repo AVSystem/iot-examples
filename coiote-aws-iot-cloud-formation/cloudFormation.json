@@ -225,8 +225,8 @@
     },
     "OperationRequestRule": {
       "DependsOn": "Lwm2mOperationLambda",
-      "Type" : "AWS::IoT::TopicRule",
-      "Properties" : {
+      "Type": "AWS::IoT::TopicRule",
+      "Properties": {
         "RuleName": "OperationRequest",
         "TopicRulePayload": {
           "Description": "This rule handles a desired LwM2M operation specified in the operation shadow",
@@ -259,8 +259,8 @@
       }
     },
     "OperationResponseRule": {
-      "Type" : "AWS::IoT::TopicRule",
-      "Properties" : {
+      "Type": "AWS::IoT::TopicRule",
+      "Properties": {
         "RuleName": "OperationResponse",
         "TopicRulePayload": {
           "Description": "This rule handles a reported LwM2M operation result",
@@ -350,7 +350,7 @@
                 {
                   "Action": [
                     "iot:CreateKeysAndCertificate",
-                    "iot: DetachPolicy",
+                    "iot:DetachPolicy",
                     "iot:UpdateCertificate",
                     "iot:DeleteCertificate"
                   ],

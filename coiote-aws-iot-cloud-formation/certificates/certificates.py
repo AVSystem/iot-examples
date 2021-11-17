@@ -15,13 +15,13 @@ class Certificate(TypedDict):
     privateKey: str
 
 
-class InternalCertificate(TypedDict):
+class InternalCertificateRequestBody(TypedDict):
     certificateAuthority: str
     certificatePem: str
     privateKey: str
 
 
-class ExternalCertificate(TypedDict):
+class ExternalCertificateRequestBody(TypedDict):
     certificatePem: str
 
 
@@ -34,8 +34,8 @@ PASSWORD = os.environ['coioteDMrestPassword']
 REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
 GROUP_ID = os.environ['coioteDMrestGroupId']
 
-cert_secret_name = 'coioteDMcert'
-cert_data_secret_name = 'coioteDMcertData'
+CERT_SECRET_NAME = 'coioteDMcert'
+CERT_DATA_SECRET_NAME = 'coioteDMcertData'
 
 
 @helper.create
@@ -73,7 +73,7 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
     cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
     cert.set_issuer(cert.get_subject())
     cert.set_pubkey(k)
-    cert.sign(k, 'sha256')
+    cert.sign(k, b'sha256')
 
     return {
         'certificatePem': crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8"),
@@ -83,7 +83,7 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
 
 def send_internal_certificate(internal_certificate, internal_cert_ca) -> Response:
 
-    request_body: InternalCertificate = {
+    request_body: InternalCertificateRequestBody = {
         'certificateAuthority': internal_cert_ca,
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
@@ -94,13 +94,13 @@ def send_internal_certificate(internal_certificate, internal_cert_ca) -> Respons
 
 
 def save_internal_certificate_data(internal_certificate):
-    secrets_manager_client.create_secret(Name=cert_data_secret_name)
+    secrets_manager_client.create_secret(Name=CERT_DATA_SECRET_NAME)
     secret_string = json.dumps(internal_certificate['certificateId'])
-    secrets_manager_client.put_secret_value(SecretId=cert_data_secret_name, SecretString=secret_string)
+    secrets_manager_client.put_secret_value(SecretId=CERT_DATA_SECRET_NAME, SecretString=secret_string)
 
 
 def send_external_certificate(external_certificate: Certificate) -> Response:
-    request_body: ExternalCertificate = {
+    request_body: ExternalCertificateRequestBody = {
         'certificatePem': external_certificate['certificatePem']
     }
 
@@ -109,19 +109,16 @@ def send_external_certificate(external_certificate: Certificate) -> Response:
 
 
 def save_certificate_in_secret_manager(external_certificate: Certificate):
-    secrets_manager_client.create_secret(Name=cert_secret_name)
-    secrets_manager_client.put_secret_value(SecretId=cert_secret_name, SecretString=json.dumps(external_certificate))
+    secrets_manager_client.create_secret(Name=CERT_SECRET_NAME)
+    secrets_manager_client.put_secret_value(SecretId=CERT_SECRET_NAME, SecretString=json.dumps(external_certificate))
 
 
 @helper.delete
 def delete(event, context):
-    try:
-        delete_internal_certificate_from_coiote()
-        delete_internal_certificate_from_aws()
-        delete_external_certificate()
-        delete_certificates_from_aws()
-    except Exception:
-        pass
+    delete_internal_certificate_from_coiote()
+    delete_internal_certificate_from_aws()
+    delete_external_certificate()
+    delete_certificates_from_aws()
 
 
 def delete_internal_certificate_from_coiote() -> Response:
@@ -130,10 +127,10 @@ def delete_internal_certificate_from_coiote() -> Response:
 
 
 def delete_internal_certificate_from_aws():
-    secret_value = secrets_manager_client.get_secret_value(SecretId=cert_data_secret_name)
+    secret_value = secrets_manager_client.get_secret_value(SecretId=CERT_DATA_SECRET_NAME)
     secret_string = json.JSONDecoder().decode(secret_value['SecretString'])
     iot_client.delete_certificate(secret_string['certificateId'])
-    secrets_manager_client.delete_secret(Name=cert_data_secret_name)
+    secrets_manager_client.delete_secret(Name=CERT_DATA_SECRET_NAME)
 
 
 def delete_external_certificate() -> Response:
@@ -142,7 +139,7 @@ def delete_external_certificate() -> Response:
 
 
 def delete_certificates_from_aws():
-    secrets_manager_client.delete_secret(Name=cert_secret_name)
+    secrets_manager_client.delete_secret(Name=CERT_SECRET_NAME)
 
 
 def handler(event, context):
