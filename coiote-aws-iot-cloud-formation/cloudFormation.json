@@ -354,22 +354,7 @@
                     "iot:UpdateCertificate",
                     "iot:DeleteCertificate"
                   ],
-                  "Resource": {
-                    "Fn::Join": [
-                      ":", [
-                        "arn",
-                        "aws",
-                        "iot",
-                        {
-                          "Ref": "AWS::Region"
-                        },
-                        {
-                          "Ref": "AWS::AccountId"
-                        },
-                        "cert/*"
-                      ]
-                    ]
-                  },
+                  "Resource": "*",
                   "Effect": "Allow"
                 }
               ]
@@ -460,9 +445,6 @@
             "coioteDMrestUsername": {
               "Ref": "coioteDMrestUsername"
             },
-            "coioteDMrestDomainId": {
-              "Ref": "coioteDMrestDomainId"
-            },
             "coioteDMrestGroupId": {
               "Ref": "coioteDMrestGroupId"
             }
@@ -489,14 +471,11 @@
     },
     "coioteDMrestPassword": {
       "Description": "Coiote DM REST User Password",
-      "Type": "String"
+      "Type": "String",
+      "NoEcho": true
     },
     "coioteDMrestUsername": {
       "Description": "Coiote DM REST User Username",
-      "Type": "String"
-    },
-    "coioteDMrestDomainId": {
-      "Description": "Coiote DM REST Domain ID",
       "Type": "String"
     },
     "coioteDMrestGroupId": {

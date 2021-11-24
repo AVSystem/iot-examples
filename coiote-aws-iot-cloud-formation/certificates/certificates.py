@@ -14,13 +14,13 @@ class Certificate(TypedDict):
     privateKey: str
 
 
-class InternalCertificateRequestBody(TypedDict):
+class ExternalCertificateRequestBody(TypedDict):
     certificateAuthority: str
     certificatePem: str
     privateKey: str
 
 
-class ExternalCertificateRequestBody(TypedDict):
+class UserAuthCertRequestBody(TypedDict):
     certificatePem: str
 
 
@@ -40,15 +40,15 @@ CERT_DATA_SECRET_NAME = 'coioteDMcertData'
 @helper.create
 def create(event, context):
 
-    internal_certificate = iot_client.create_keys_and_certificate(setAsActive=True)
-    external_certificate = generate_external_cert(email_address=USER, common_name=USER)
+    external_certificate = iot_client.create_keys_and_certificate(setAsActive=True)
+    user_auth_cert = generate_external_cert(email_address=USER, common_name=USER)
     ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
-    internal_cert_ca = ca_result.content.decode('UTF-8')
+    external_cert_ca = ca_result.content.decode('UTF-8')
 
-    save_certificate_in_secret_manager(external_certificate)
-    send_internal_certificate(internal_certificate, internal_cert_ca)
-    save_internal_certificate_data(internal_certificate)
-    send_external_certificate(external_certificate)
+    save_external_certificate_data(external_certificate)
+    send_external_certificate(external_certificate, external_cert_ca)
+    send_user_auth_cert(user_auth_cert)
+    save_certificate_in_secrets_manager(user_auth_cert)
 
 
 def generate_external_cert(email_address: str, common_name: str, serial_number=0) -> Certificate:
@@ -79,26 +79,26 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
     }
 
 
-def send_internal_certificate(internal_certificate, internal_cert_ca) -> Response:
+def send_external_certificate(internal_certificate, internal_cert_ca) -> Response:
 
-    request_body: InternalCertificateRequestBody = {
+    request_body: ExternalCertificateRequestBody = {
         'certificateAuthority': internal_cert_ca,
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
     }
 
-    uri = REST_URI + '/awsIntegration/auth/internalCertificate/' + GROUP_ID
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
     return requests.post(uri, json=request_body, auth=(USER, PASSWORD))
 
 
-def save_internal_certificate_data(internal_certificate):
+def save_external_certificate_data(internal_certificate):
     secrets_manager_client.create_secret(Name=CERT_DATA_SECRET_NAME)
     secret_string = json.dumps(internal_certificate['certificateId'])
     secrets_manager_client.put_secret_value(SecretId=CERT_DATA_SECRET_NAME, SecretString=secret_string)
 
 
-def send_external_certificate(external_certificate: Certificate) -> Response:
-    request_body: ExternalCertificateRequestBody = {
+def send_user_auth_cert(external_certificate: Certificate) -> Response:
+    request_body: UserAuthCertRequestBody = {
         'certificatePem': external_certificate['certificatePem']
     }
 
@@ -106,37 +106,37 @@ def send_external_certificate(external_certificate: Certificate) -> Response:
     return requests.post(uri, json=request_body, auth=(USER, PASSWORD))
 
 
-def save_certificate_in_secret_manager(external_certificate: Certificate):
+def save_certificate_in_secrets_manager(external_certificate: Certificate):
     secrets_manager_client.create_secret(Name=CERT_SECRET_NAME)
     secrets_manager_client.put_secret_value(SecretId=CERT_SECRET_NAME, SecretString=json.dumps(external_certificate))
 
 
 @helper.delete
 def delete(event, context):
-    delete_internal_certificate_from_coiote()
-    delete_internal_certificate_from_aws()
-    delete_external_certificate()
-    delete_certificates_from_aws()
+    delete_external_certificate_from_aws()
+    delete_external_certificate_from_coiote()
+    delete_user_auth_cert_from_coiote()
+    delete_certificate_from_secrets_manager()
 
 
-def delete_internal_certificate_from_coiote() -> Response:
-    uri = REST_URI + '/awsIntegration/auth/internalCertificate/' + GROUP_ID
+def delete_external_certificate_from_coiote() -> Response:
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
     return requests.delete(uri, auth=(USER, PASSWORD))
 
 
-def delete_internal_certificate_from_aws():
+def delete_external_certificate_from_aws():
     secret_value = secrets_manager_client.get_secret_value(SecretId=CERT_DATA_SECRET_NAME)
     secret_string = json.JSONDecoder().decode(secret_value['SecretString'])
     iot_client.delete_certificate(secret_string['certificateId'])
     secrets_manager_client.delete_secret(Name=CERT_DATA_SECRET_NAME)
 
 
-def delete_external_certificate() -> Response:
-    uri = REST_URI + '/auth/certificates/' + USER
+def delete_user_auth_cert_from_coiote() -> Response:
+    uri = REST_URI + '/auth/certificates/'
     return requests.delete(uri, auth=(USER, PASSWORD))
 
 
-def delete_certificates_from_aws():
+def delete_certificate_from_secrets_manager():
     secrets_manager_client.delete_secret(Name=CERT_SECRET_NAME)
 
 
