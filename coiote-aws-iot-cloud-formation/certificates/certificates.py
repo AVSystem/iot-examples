@@ -126,9 +126,10 @@ def delete_external_certificate_from_coiote() -> Response:
 
 def delete_external_certificate_from_aws():
     secret_value = secrets_manager_client.get_secret_value(SecretId=CERT_DATA_SECRET_NAME)
-    secret_string = json.JSONDecoder().decode(secret_value['SecretString'])
-    iot_client.delete_certificate(secret_string['certificateId'])
-    secrets_manager_client.delete_secret(Name=CERT_DATA_SECRET_NAME)
+    secret_string = json.loads(secret_value['SecretString'])
+    iot_client.update_certificate(certificateId=secret_string, newStatus='INACTIVE')
+    iot_client.delete_certificate(certificateId=secret_string)
+    secrets_manager_client.delete_secret(SecretId=CERT_DATA_SECRET_NAME, ForceDeleteWithoutRecovery=True)
 
 
 def delete_user_auth_cert_from_coiote() -> Response:
@@ -137,7 +138,7 @@ def delete_user_auth_cert_from_coiote() -> Response:
 
 
 def delete_certificate_from_secrets_manager():
-    secrets_manager_client.delete_secret(Name=CERT_SECRET_NAME)
+    secrets_manager_client.delete_secret(SecretId=CERT_SECRET_NAME, ForceDeleteWithoutRecovery=True)
 
 
 def handler(event, context):
