@@ -1,12 +1,13 @@
 import json
 import os
+import logging
 from typing import TypedDict
 
 import boto3
 import requests
+from requests.exceptions import HTTPError
 from OpenSSL import crypto
 from crhelper import CfnResource
-from requests import Response
 
 
 class Certificate(TypedDict):
@@ -27,6 +28,7 @@ class UserAuthCertRequestBody(TypedDict):
 helper = CfnResource()
 iot_client = boto3.client('iot')
 secrets_manager_client = boto3.client('secretsmanager')
+logger = logging.getLogger()
 
 USER = os.environ['coioteDMrestUsername']
 PASSWORD = os.environ['coioteDMrestPassword']
@@ -37,18 +39,27 @@ CERT_SECRET_NAME = 'coioteDMcert'
 CERT_DATA_SECRET_NAME = 'coioteDMcertData'
 
 
+def log_success(msg: str):
+    logger.info(f"SUCCESS: {msg}")
+
+
 @helper.create
 def create(event, context):
-
     external_certificate = iot_client.create_keys_and_certificate(setAsActive=True)
+    log_success("Certificate created in IoT Core.")
+
     user_auth_cert = generate_external_cert(email_address=USER, common_name=USER)
     ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
+    ca_result.raise_for_status()
+
     external_cert_ca = ca_result.content.decode('UTF-8')
 
     save_external_certificate_data(external_certificate)
     send_external_certificate(external_certificate, external_cert_ca)
     send_user_auth_cert(user_auth_cert)
     save_certificate_in_secrets_manager(user_auth_cert)
+
+    log_success("All certificates have been successfully created.")
 
 
 def generate_external_cert(email_address: str, common_name: str, serial_number=0) -> Certificate:
@@ -79,66 +90,116 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
     }
 
 
-def send_external_certificate(internal_certificate, internal_cert_ca) -> Response:
-
+def send_external_certificate(internal_certificate, internal_cert_ca):
     request_body: ExternalCertificateRequestBody = {
         'certificateAuthority': internal_cert_ca,
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
     }
-
     uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
-    return requests.post(uri, json=request_body, auth=(USER, PASSWORD))
+    requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
+    log_success("IoT Core certificate id saved in CoioteDM.")
 
 
 def save_external_certificate_data(internal_certificate):
     secrets_manager_client.create_secret(Name=CERT_DATA_SECRET_NAME)
     secret_string = json.dumps(internal_certificate['certificateId'])
     secrets_manager_client.put_secret_value(SecretId=CERT_DATA_SECRET_NAME, SecretString=secret_string)
+    log_success("IoT Core certificate id saved in AWS Secrets Manager.")
 
 
-def send_user_auth_cert(external_certificate: Certificate) -> Response:
+def send_user_auth_cert(external_certificate: Certificate):
     request_body: UserAuthCertRequestBody = {
         'certificatePem': external_certificate['certificatePem']
     }
-
     uri = REST_URI + '/auth/certificates'
-    return requests.post(uri, json=request_body, auth=(USER, PASSWORD))
+    requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
+    log_success("User authentication certificate saved in CoioteDM.")
 
 
 def save_certificate_in_secrets_manager(external_certificate: Certificate):
     secrets_manager_client.create_secret(Name=CERT_SECRET_NAME)
     secrets_manager_client.put_secret_value(SecretId=CERT_SECRET_NAME, SecretString=json.dumps(external_certificate))
+    log_success("User authentication certificate saved in AWS Secrets Manager.")
 
 
 @helper.delete
 def delete(event, context):
-    delete_external_certificate_from_aws()
-    delete_external_certificate_from_coiote()
-    delete_user_auth_cert_from_coiote()
-    delete_certificate_from_secrets_manager()
+    removal_actions = [
+        delete_external_certificate_from_aws(),
+        delete_external_certificate_from_coiote(),
+        delete_user_auth_cert_from_coiote(),
+        delete_certificate_from_secrets_manager(),
+    ]
+    if not all(removal_actions):
+        raise Exception("Delete action went wrong, check CloudWatch logs for more details.")
+    else:
+        log_success("All certificates have been successfully removed.")
 
 
-def delete_external_certificate_from_coiote() -> Response:
+def delete_external_certificate_from_coiote() -> bool:
     uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
-    return requests.delete(uri, auth=(USER, PASSWORD))
+    try:
+        requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
+    except HTTPError as e:
+        logger.error(e)
+        return False
+
+    log_success("IoT Core certificate removed from CoioteDM.")
+    return True
 
 
-def delete_external_certificate_from_aws():
-    secret_value = secrets_manager_client.get_secret_value(SecretId=CERT_DATA_SECRET_NAME)
-    secret_string = json.loads(secret_value['SecretString'])
-    iot_client.update_certificate(certificateId=secret_string, newStatus='INACTIVE')
-    iot_client.delete_certificate(certificateId=secret_string)
-    secrets_manager_client.delete_secret(SecretId=CERT_DATA_SECRET_NAME, ForceDeleteWithoutRecovery=True)
+def delete_external_certificate_from_aws() -> bool:
+    try:
+        secret_value = secrets_manager_client.get_secret_value(SecretId=CERT_DATA_SECRET_NAME)
+        secret_string = json.loads(secret_value['SecretString'])
+
+        try:
+            iot_client.update_certificate(certificateId=secret_string, newStatus='INACTIVE')
+            iot_client.delete_certificate(certificateId=secret_string)
+        except iot_client.exceptions.ResourceNotFoundException:
+            logger.warning("Certificate not found in IoT Core, it could have been removed manually.")
+
+        try:
+            secrets_manager_client.delete_secret(SecretId=CERT_DATA_SECRET_NAME, ForceDeleteWithoutRecovery=True)
+        except secrets_manager_client.exceptions.ResourceNotFoundException:
+            pass
+
+    except secrets_manager_client.exceptions.ResourceNotFoundException:
+        logger.error("IoT Core certificate id not found in Secrets Manager.")
+        return False
+    except Exception as e:
+        logger.error(e)
+        return False
+
+    log_success("IoT Core certificate removed from AWS Secrets Manager.")
+    return True
 
 
-def delete_user_auth_cert_from_coiote() -> Response:
+def delete_user_auth_cert_from_coiote() -> bool:
     uri = REST_URI + '/auth/certificates/'
-    return requests.delete(uri, auth=(USER, PASSWORD))
+
+    try:
+        requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
+    except HTTPError as e:
+        logger.error(e)
+        return False
+
+    log_success("User authentication certificate removed from CoioteDM")
+    return True
 
 
-def delete_certificate_from_secrets_manager():
-    secrets_manager_client.delete_secret(SecretId=CERT_SECRET_NAME, ForceDeleteWithoutRecovery=True)
+def delete_certificate_from_secrets_manager() -> bool:
+    try:
+        secrets_manager_client.delete_secret(SecretId=CERT_SECRET_NAME, ForceDeleteWithoutRecovery=True)
+    except secrets_manager_client.exceptions.ResourceNotFoundException:
+        logger.warning("Certificate not found in Secrets Manager, it could have been removed manually.")
+    except Exception as e:
+        logger.error(e)
+        return False
+
+    log_success("User authentication certificate removed from AWS Secrets Manager")
+    return True
 
 
 def handler(event, context):
