@@ -98,7 +98,7 @@ def send_external_certificate(internal_certificate, internal_cert_ca):
     }
     uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
     requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
-    log_success("IoT Core certificate id saved in CoioteDM.")
+    log_success("IoT Core certificate saved in CoioteDM.")
 
 
 def save_external_certificate_data(internal_certificate):
@@ -165,8 +165,9 @@ def delete_external_certificate_from_aws() -> bool:
         except secrets_manager_client.exceptions.ResourceNotFoundException:
             pass
 
-    except secrets_manager_client.exceptions.ResourceNotFoundException:
+    except secrets_manager_client.exceptions.ResourceNotFoundException as e:
         logger.error("IoT Core certificate id not found in Secrets Manager.")
+        logger.error(e)
         return False
     except Exception as e:
         logger.error(e)
