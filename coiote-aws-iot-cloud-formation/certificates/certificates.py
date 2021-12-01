@@ -166,7 +166,10 @@ def delete_external_certificate_from_aws() -> bool:
             pass
 
     except secrets_manager_client.exceptions.ResourceNotFoundException as e:
-        logger.error("IoT Core certificate id not found in Secrets Manager.")
+        logger.error(
+            "IoT Core certificate id not found in Secrets Manager."
+            "Certificate will be kept in IoT Core if it has not been removed manually."
+        )
         logger.error(e)
         return False
     except Exception as e:
