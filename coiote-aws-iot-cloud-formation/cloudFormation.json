@@ -445,8 +445,8 @@
             "coioteDMrestUsername": {
               "Ref": "coioteDMrestUsername"
             },
-            "coioteDMrestGroupId": {
-              "Ref": "coioteDMrestGroupId"
+            "coioteDMrestDomainId": {
+              "Ref": "coioteDMrestDomainId"
             }
           }
         }
@@ -478,8 +478,8 @@
       "Description": "Coiote DM REST User Username",
       "Type": "String"
     },
-    "coioteDMrestGroupId": {
-      "Description": "Coiote DM REST Group ID",
+    "coioteDMrestDomainId": {
+      "Description": "Coiote DM REST Domain ID",
       "Type": "String"
     }
   }
