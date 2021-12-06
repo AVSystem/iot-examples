@@ -1,7 +1,6 @@
 import json
 import os
 import logging
-import urllib
 from typing import TypedDict
 
 import boto3
@@ -34,7 +33,6 @@ logger = logging.getLogger()
 USER = os.environ['coioteDMrestUsername']
 PASSWORD = os.environ['coioteDMrestPassword']
 REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
-DOMAIN_ID = os.environ['coioteDMrestDomainId']
 
 CERT_SECRET_NAME = 'coioteDMcert'
 CERT_DATA_SECRET_NAME = 'coioteDMcertData'
@@ -97,7 +95,7 @@ def send_external_certificate(internal_certificate, internal_cert_ca):
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
     }
-    uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + urllib.parse.quote_plus(DOMAIN_ID)
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate/'
     requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
     log_success("IoT Core certificate saved in CoioteDM.")
 
@@ -139,7 +137,7 @@ def delete(event, context):
 
 
 def delete_external_certificate_from_coiote() -> bool:
-    uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + urllib.parse.quote_plus(DOMAIN_ID)
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate/'
     try:
         requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
     except HTTPError as e:
