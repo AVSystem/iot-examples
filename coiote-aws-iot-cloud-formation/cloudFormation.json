@@ -198,7 +198,14 @@
             "Arn"
           ]
         },
-        "Runtime": "python3.8"
+        "Runtime": "python3.8",
+        "Environment": {
+          "Variables": {
+            "coioteDMrestUri": {
+              "Ref": "coioteDMrestUri"
+            }
+          }
+        }
       }
     },
     "LambdaInvocationPermission": {
