@@ -1,6 +1,6 @@
 import json
 import os
-import tempfile
+from tempfile import NamedTemporaryFile
 from dataclasses import dataclass
 
 import boto3
@@ -9,21 +9,21 @@ import requests
 REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
 
 
-def getCertificateFiles():
-    userAuthCert = getCoioteSecrets()
-    certificatePem = tempfile.NamedTemporaryFile(delete=False)
-    privateKey = tempfile.NamedTemporaryFile(delete=False)
-    certificatePemFile = certificatePem.name
-    privateKeyFile = privateKey.name
+def get_certificate_files():
+    user_auth_cert = get_user_auth_cert()
+    certificate_pem = NamedTemporaryFile(delete=False)
+    private_key = NamedTemporaryFile(delete=False)
+    certificate_pem_file = certificate_pem.name
+    private_key_file = private_key.name
     try:
-        certificatePem.write(str.encode(userAuthCert.certificatePem))
-        privateKey.write(str.encode(userAuthCert.privateKey))
-        certificatePem.close()
-        privateKey.close()
-        yield certificatePemFile, privateKeyFile
+        certificate_pem.write(str.encode(user_auth_cert.certificatePem))
+        private_key.write(str.encode(user_auth_cert.privateKey))
+        certificate_pem.close()
+        private_key.close()
+        yield certificate_pem_file, private_key_file
     finally:
-        os.unlink(certificatePemFile)
-        os.unlink(privateKeyFile)
+        os.unlink(certificate_pem_file)
+        os.unlink(private_key_file)
 
 
 @dataclass
@@ -32,7 +32,7 @@ class UserAuthCert:
     privateKey: str
 
 
-def getCoioteSecrets() -> UserAuthCert:
+def get_user_auth_cert() -> UserAuthCert:
     secretName = "coioteDMrest"
 
     session = boto3.session.Session()
@@ -146,15 +146,15 @@ def lambda_handler(event, context):
             keysCsStr = ','.join(keys)
             #valuesCsStr = ','.join(values)
             valuesCsStr = ','.join([str(x) for x in values])
-            body='{"templateName":"AWSwrite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"values","value":"'+valuesCsStr+'"}]}}'
+            body={"templateName":"AWSwrite","config":{"parameters":[{"name":"keys","value":keysCsStr},{"name":"values","value":valuesCsStr}]}}
 
         elif operation == 'read':
             keysCsStr = pathsOptimization(keys)
-            body='{"templateName":"AWSread","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
+            body={"templateName":"AWSread","config":{"parameters":[{"name":"keys","value":keysCsStr}]}}
 
         elif operation == 'readComposite':
             keysCsStr = pathsOptimization(keys)
-            body='{"templateName":"AWSreadComposite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
+            body={"templateName":"AWSreadComposite","config":{"parameters":[{"name":"keys","value":keysCsStr}]}}
 
         elif operation == 'observe':
             i=0
@@ -207,12 +207,12 @@ def lambda_handler(event, context):
             ###attributesCsStr = str(attributes)[1:-1].replace(" ","")
             attributesStr = str(attributes).replace(" ","")
             #keysCsStr = pathsOptimization(keys)
-            body='{"templateName":"AWSobserve","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"attributes","value":"'+attributesStr+'"}]}}'
+            body={"templateName":"AWSobserve","config":{"parameters":[{"name":"keys","value":keysCsStr},{"name":"attributes","value":attributesStr}]}}
 
         elif operation == 'observeComposite':
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
-            body='{"templateName":"AWSobserveComposite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
+            body={"templateName":"AWSobserveComposite","config":{"parameters":[{"name":"keys","value":keysCsStr}]}}
 
         elif operation == 'execute':
             if len(keys) != 1:
@@ -222,13 +222,13 @@ def lambda_handler(event, context):
                     'body': '{"error":"Only one LwM2M path can be passed for execute operation - keys array must contain only one element"}'
                 }
             if not 'arguments' in event:
-                body='{"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":"'+keys[0]+'"}]}}'
+                body={"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":keys[0]}]}}
             else:
                 arguments = event['arguments']
                 if arguments is not None:
-                    body='{"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":"'+keys[0]+'"},{"name":"arguments","value":"'+arguments+'"}]}}'
+                    body={"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":keys[0]},{"name":"arguments","value":arguments}]}}
                 else:
-                    body='{"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":"'+keys[0]+'"}]}}'
+                    body={"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":keys[0]}]}}
 
         elif operation == 'cancelObserve':
             # even if there are other keys in 'keys', set it to be just 'all' if 'keys' contains 'all'
@@ -237,12 +237,12 @@ def lambda_handler(event, context):
             else:
                 keys = list(set(keys))
                 keysCsStr = ','.join(keys)
-            body='{"templateName":"AWScancelObserve","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
+            body={"templateName":"AWScancelObserve","config":{"parameters":[{"name":"keys","value":keysCsStr}]}}
 
         elif operation == 'cancelObserveComposite':
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
-            body='{"templateName":"AWScancelObserveComposite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
+            body={"templateName":"AWScancelObserveComposite","config":{"parameters":[{"name":"keys","value":keysCsStr}]}}
 
         elif operation == 'writeAttributes':
             i=0
@@ -277,7 +277,7 @@ def lambda_handler(event, context):
                 i+=1
             keysCsStr = ','.join(keys)
             attributesStr = str(attributes).replace(" ","").replace("None","''")
-            body='{"templateName":"AWSwriteAttributes","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"attributes","value":"'+attributesStr+'"}]}}'
+            body={"templateName":"AWSwriteAttributes","config":{"parameters":[{"name":"keys","value":keysCsStr},{"name":"attributes","value":attributesStr}]}}
 
         else:
             print('Error: operation '+operation+' is not implemented for AWS-CoioteDM integration')
@@ -294,10 +294,10 @@ def lambda_handler(event, context):
         we can also add an optional parameter in the shadow to wait for a device (by default set to false) and in this case not performing 2nd call triggering session
         If instead these 2 the method commented above is used, Coiote will respond with error indicating that the device is deregistered and the task will not be scheduled at all
         """
-        for certificate, privateKey in getCertificateFiles():
+        for certificate, private_key in get_certificate_files():
             uri = REST_URI+'/tasksFromTemplates/device/'+thingName
-            headers = {'Content-Type': 'application/json', 'Authorization': 'Certificate'}
-            apiCallResp = requests.post(uri, data=body, headers=headers, cert=(certificate, privateKey), verify=False, timeout=10)
+            headers = {'Authorization': 'Certificate'}
+            apiCallResp = requests.post(uri, json=body, headers=headers, cert=(certificate, private_key), verify=False, timeout=10)
             qjResponseCode = apiCallResp.status_code
             qjResponseBody = apiCallResp.text
             if qjResponseCode != 201:
@@ -309,7 +309,7 @@ def lambda_handler(event, context):
 
             uri = REST_URI+'/sessions/'+thingName+'/allow-deregistered'
             headers = {'Authorization': 'Certificate'}
-            apiCallResp = requests.post(uri, headers=headers, cert=(certificate, privateKey), verify=False, timeout=10)
+            apiCallResp = requests.post(uri, headers=headers, cert=(certificate, private_key), verify=False, timeout=10)
             qjResponseCode = apiCallResp.status_code
             qjResponseBody = apiCallResp.text
             if qjResponseCode != 200:
