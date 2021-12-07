@@ -1,25 +1,29 @@
 import json
 import os
-
-import requests
-import boto3
+import tempfile
 from dataclasses import dataclass
-from OpenSSL.crypto import X509, PKey
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
-from cryptography import x509
 
+import boto3
+import requests
 
 REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
 
 
-class Pkcs12Context(requests.packages.urllib3.contrib.pyopenssl.OpenSSL.SSL.Context):
-    def __init__(self, method):
-        super().__init__(method)
-        certificate = getCoioteSecrets()
-        cert = x509.load_pem_x509_certificate(str.encode(certificate.certificatePem))
-        pkey = load_pem_private_key(str.encode(certificate.privateKey), None)
-        self.use_certificate(X509.from_cryptography(cert))
-        self.use_privatekey(PKey.from_cryptography_key(pkey))
+def getCertificateFiles():
+    userAuthCert = getCoioteSecrets()
+    certificatePem = tempfile.NamedTemporaryFile(delete=False)
+    privateKey = tempfile.NamedTemporaryFile(delete=False)
+    certificatePemFile = certificatePem.name
+    privateKeyFile = privateKey.name
+    try:
+        certificatePem.write(str.encode(userAuthCert.certificatePem))
+        privateKey.write(str.encode(userAuthCert.privateKey))
+        certificatePem.close()
+        privateKey.close()
+        yield certificatePemFile, privateKeyFile
+    finally:
+        os.unlink(certificatePemFile)
+        os.unlink(privateKeyFile)
 
 
 @dataclass
@@ -282,15 +286,7 @@ def lambda_handler(event, context):
                 'body': '{"error":"operation '+operation+' is not implemented for AWS-CoioteDM integration"}'
             }
 
-        try:
-            requests.packages.urllib3.contrib.pyopenssl.OpenSSL.SSL.Context = Pkcs12Context
-        except Exception as ex:
-            print('Error: ' + str(ex))
-            return {
-                'statusCode': 400,
-                'body': '{"error":"' + str(ex) + '"}'
-            }
-        #uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/deviceBlocking/'+thingName
+        # uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/deviceBlocking/'+thingName
         """
         in this approach, the task is scheduled at Coiote - and then we are performing 2nd call to trigger session even if a device is deregistered
         as the task has exec condition that it is executed only when the device is registered
@@ -298,27 +294,28 @@ def lambda_handler(event, context):
         we can also add an optional parameter in the shadow to wait for a device (by default set to false) and in this case not performing 2nd call triggering session
         If instead these 2 the method commented above is used, Coiote will respond with error indicating that the device is deregistered and the task will not be scheduled at all
         """
-        uri = REST_URI+'/tasksFromTemplates/device/'+thingName
-        headers = {'Content-Type': 'application/json', 'Authorization': 'Certificate'}
-        apiCallResp = requests.post(uri, data=body, headers=headers)
-        qjResponseCode = apiCallResp.status_code
-        qjResponseBody = apiCallResp.text
-        if qjResponseCode != 201:
-            print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+        for certificate, privateKey in getCertificateFiles():
+            uri = REST_URI+'/tasksFromTemplates/device/'+thingName
+            headers = {'Content-Type': 'application/json', 'Authorization': 'Certificate'}
+            apiCallResp = requests.post(uri, data=body, headers=headers, cert=(certificate, privateKey), verify=False, timeout=10)
+            qjResponseCode = apiCallResp.status_code
+            qjResponseBody = apiCallResp.text
+            if qjResponseCode != 201:
+                print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+                return {
+                    'statusCode': qjResponseCode,
+                    'body': qjResponseBody
+                }
+
+            uri = REST_URI+'/sessions/'+thingName+'/allow-deregistered'
+            headers = {'Authorization': 'Certificate'}
+            apiCallResp = requests.post(uri, headers=headers, cert=(certificate, privateKey), verify=False, timeout=10)
+            qjResponseCode = apiCallResp.status_code
+            qjResponseBody = apiCallResp.text
+            if qjResponseCode != 200:
+                print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+
             return {
                 'statusCode': qjResponseCode,
                 'body': qjResponseBody
             }
-
-        uri = REST_URI+'/sessions/'+thingName+'/allow-deregistered'
-        headers = {'Authorization': 'Certificate'}
-        apiCallResp = requests.post(uri, headers=headers)
-        qjResponseCode = apiCallResp.status_code
-        qjResponseBody = apiCallResp.text
-        if qjResponseCode != 200:
-            print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
-
-        return {
-            'statusCode': qjResponseCode,
-            'body': qjResponseBody
-        }
