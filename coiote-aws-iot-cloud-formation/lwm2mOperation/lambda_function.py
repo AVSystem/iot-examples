@@ -48,7 +48,7 @@ class UserAuthCert:
 
 
 def get_user_auth_cert() -> UserAuthCert:
-    secret_name = 'coioteDMrest'
+    secret_name = 'coioteDMcert'
 
     session = boto3.session.Session()
     client = session.client('secretsmanager')
@@ -58,10 +58,10 @@ def get_user_auth_cert() -> UserAuthCert:
             SecretId=secret_name
         )
     except Exception:
-        raise Exception('Coiote DM credentials not found in Secrets Manager')
+        raise Exception('Coiote DM certificate not found in Secrets Manager')
 
     if 'SecretString' not in get_secret_value_response:
-        raise Exception('Coiote DM credentials are not set up correctly')
+        raise Exception('Coiote DM certificate are not set up correctly')
 
     secrets_map = json.JSONDecoder().decode(get_secret_value_response['SecretString'])
 

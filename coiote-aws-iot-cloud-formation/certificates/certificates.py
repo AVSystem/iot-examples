@@ -95,8 +95,8 @@ def send_external_certificate(internal_certificate, internal_cert_ca):
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
     }
-    uri = REST_URI + '/awsIntegration/auth/externalCertificate/'
-    requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate'
+    requests.post(uri, json=request_body, auth=(USER, PASSWORD), verify=False).raise_for_status()
     log_success("IoT Core certificate saved in CoioteDM.")
 
 
@@ -112,7 +112,7 @@ def send_user_auth_cert(external_certificate: Certificate):
         'certificatePem': external_certificate['certificatePem']
     }
     uri = REST_URI + '/auth/certificates'
-    requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
+    requests.post(uri, json=request_body, auth=(USER, PASSWORD), verify=False).raise_for_status()
     log_success("User authentication certificate saved in CoioteDM.")
 
 
@@ -137,9 +137,9 @@ def delete(event, context):
 
 
 def delete_external_certificate_from_coiote() -> bool:
-    uri = REST_URI + '/awsIntegration/auth/externalCertificate/'
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate'
     try:
-        requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
+        requests.delete(uri, auth=(USER, PASSWORD), verify=False).raise_for_status()
     except HTTPError as e:
         logger.error(e)
         return False
@@ -183,7 +183,7 @@ def delete_user_auth_cert_from_coiote() -> bool:
     uri = REST_URI + '/auth/certificates/'
 
     try:
-        requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
+        requests.delete(uri, auth=(USER, PASSWORD), verify=False).raise_for_status()
     except HTTPError as e:
         logger.error(e)
         return False

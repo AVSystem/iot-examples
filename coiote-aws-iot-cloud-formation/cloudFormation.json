@@ -38,7 +38,7 @@
                           "Ref": "AWS::AccountId"
                         },
                         "secret",
-                        "coioteDMrest-??????"
+                        "coioteDMcert-??????"
                       ]
                     ]
                   },
