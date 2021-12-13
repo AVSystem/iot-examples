@@ -46,6 +46,8 @@ def log_success(msg: str):
 def create(event, context):
     external_certificate = iot_client.create_keys_and_certificate(setAsActive=True)
     log_success("Certificate created in IoT Core.")
+    cert_policy = event['ResourceProperties']['PolicyName']
+    iot_client.attach_principal_policy(policyName=cert_policy, principal=external_certificate['certificateArn'])
 
     user_auth_cert = generate_external_cert(email_address=USER, common_name=USER)
     ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
