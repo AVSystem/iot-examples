@@ -149,7 +149,7 @@ def lambda_handler(event, context):
             keysCsStr = ','.join(keys)
             valuesCsStr = ','.join([str(x) for x in values])
             body = {
-                'templateName': 'AWSwrite',
+                'templateName': 'AWSwriteCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}, {'name': 'values', 'value': valuesCsStr}]
                 }
@@ -157,7 +157,7 @@ def lambda_handler(event, context):
         elif operation == 'read':
             keysCsStr = pathsOptimization(keys)
             body = {
-                'templateName': 'AWSread',
+                'templateName': 'AWSreadCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}]
                 }
@@ -165,7 +165,7 @@ def lambda_handler(event, context):
         elif operation == 'readComposite':
             keysCsStr = pathsOptimization(keys)
             body = {
-                'templateName': 'AWSreadComposite',
+                'templateName': 'AWSreadCompositeCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}]
                 }
@@ -217,7 +217,7 @@ def lambda_handler(event, context):
             attributesStr = str(attributes).replace(' ', '')
             #keysCsStr = pathsOptimization(keys)
             body = {
-                'templateName': 'AWSobserve',
+                'templateName': 'AWSobserveCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}, {'name': 'attributes', 'value': attributesStr}]
                 }
@@ -226,7 +226,7 @@ def lambda_handler(event, context):
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
             body = {
-                'templateName': 'AWSobserveComposite',
+                'templateName': 'AWSobserveCompositeCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}]
                 }
@@ -237,7 +237,7 @@ def lambda_handler(event, context):
                 return operation_error(400, 'Only one LwM2M path can be passed for execute operation - keys array must contain only one element')
             if 'arguments' not in event:
                 body = {
-                    'templateName': 'AWSexecute',
+                    'templateName': 'AWSexecuteCertAuth',
                     'config': {
                         'parameters': [{'name': 'keys', 'value': keys[0]}]
                     }
@@ -246,14 +246,14 @@ def lambda_handler(event, context):
                 arguments = event['arguments']
                 if arguments is not None:
                     body = {
-                        'templateName': 'AWSexecute',
+                        'templateName': 'AWSexecuteCertAuth',
                         'config': {
                             'parameters': [{'name': 'keys', 'value': keys[0]}, {'name': 'arguments', 'value': arguments}]
                         }
                     }
                 else:
                     body = {
-                        'templateName': 'AWSexecute',
+                        'templateName': 'AWSexecuteCertAuth',
                         'config': {
                             'parameters': [{'name': 'keys', 'value': keys[0]}]
                         }
@@ -267,7 +267,7 @@ def lambda_handler(event, context):
                 keysCsStr = ','.join(keys)
 
             body = {
-                'templateName': 'AWScancelObserve',
+                'templateName': 'AWScancelObserveCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}]
                 }
@@ -276,7 +276,7 @@ def lambda_handler(event, context):
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
             body = {
-                'templateName': 'AWScancelObserveComposite',
+                'templateName': 'AWScancelObserveCompositeCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}]
                 }
@@ -306,7 +306,7 @@ def lambda_handler(event, context):
             keysCsStr = ','.join(keys)
             attributesStr = str(attributes).replace(' ', '').replace('None', "''")
             body = {
-                'templateName': 'AWSwriteAttributes',
+                'templateName': 'AWSwriteAttributesCertAuth',
                 'config': {
                     'parameters': [{'name': 'keys', 'value': keysCsStr}, {'name': 'attributes', 'value': attributesStr}]
                 }

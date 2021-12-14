@@ -157,7 +157,7 @@ def delete_external_certificate_from_aws() -> bool:
 
         try:
             iot_client.update_certificate(certificateId=secret_string, newStatus='INACTIVE')
-            iot_client.delete_certificate(certificateId=secret_string)
+            iot_client.delete_certificate(certificateId=secret_string, forceDelete=True)
         except iot_client.exceptions.ResourceNotFoundException:
             logger.warning("Certificate not found in IoT Core, it could have been removed manually.")
 
