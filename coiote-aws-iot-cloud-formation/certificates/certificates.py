@@ -160,11 +160,8 @@ def delete_external_certificate_from_aws() -> bool:
             iot_client.delete_certificate(certificateId=secret_string, forceDelete=True)
         except iot_client.exceptions.ResourceNotFoundException:
             logger.warning("Certificate not found in IoT Core, it could have been removed manually.")
-
-        try:
+        finally:
             secrets_manager_client.delete_secret(SecretId=CERT_DATA_SECRET_NAME, ForceDeleteWithoutRecovery=True)
-        except secrets_manager_client.exceptions.ResourceNotFoundException:
-            pass
 
     except secrets_manager_client.exceptions.ResourceNotFoundException as e:
         logger.error(
