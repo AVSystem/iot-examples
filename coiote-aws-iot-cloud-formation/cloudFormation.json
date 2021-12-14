@@ -23,7 +23,7 @@
               "Version": "2012-10-17",
               "Statement": [
                 {
-                  "Sid": "GetSecrets",
+                  "Sid": "Secrets",
                   "Action": "secretsmanager:GetSecretValue",
                   "Resource": {
                     "Fn::Join": [
@@ -376,7 +376,7 @@
               "Version": "2012-10-17",
               "Statement": [
                 {
-                  "Sid": "GetSecrets",
+                  "Sid": "Secrets",
                   "Action": [
                     "secretsmanager:CreateSecret",
                     "secretsmanager:DeleteSecret",
@@ -459,14 +459,14 @@
         }
       }
     },
-    "IotPolicy": {
+    "IotCertificatePolicy": {
       "Type": "AWS::IoT::Policy",
       "Properties": {
         "PolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
             {
-              "Sid": "GetSecrets",
+              "Sid": "IotOperations",
               "Action": [
                 "iot:Connect",
                 "iot:Publish",
@@ -509,7 +509,7 @@
           ]
         },
         "PolicyName": {
-          "Ref": "IotPolicy"
+          "Ref": "IotCertificatePolicy"
         }
       }
     }
