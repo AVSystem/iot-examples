@@ -16,7 +16,6 @@ class Certificate(TypedDict):
 
 
 class ExternalCertificateRequestBody(TypedDict):
-    certificateAuthority: str
     certificatePem: str
     privateKey: str
 
@@ -50,13 +49,9 @@ def create(event, context):
     iot_client.attach_principal_policy(policyName=cert_policy, principal=external_certificate['certificateArn'])
 
     user_auth_cert = generate_external_cert(email_address=USER, common_name=USER)
-    ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
-    ca_result.raise_for_status()
-
-    external_cert_ca = ca_result.content.decode('UTF-8')
 
     save_external_certificate_data(external_certificate)
-    send_external_certificate(external_certificate, external_cert_ca)
+    send_external_certificate(external_certificate)
     send_user_auth_cert(user_auth_cert)
     save_certificate_in_secrets_manager(user_auth_cert)
 
@@ -91,9 +86,8 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
     }
 
 
-def send_external_certificate(internal_certificate, internal_cert_ca):
+def send_external_certificate(internal_certificate):
     request_body: ExternalCertificateRequestBody = {
-        'certificateAuthority': internal_cert_ca,
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
     }
