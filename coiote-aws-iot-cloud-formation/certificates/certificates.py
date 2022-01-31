@@ -16,7 +16,6 @@ class Certificate(TypedDict):
 
 
 class ExternalCertificateRequestBody(TypedDict):
-    certificateAuthority: str
     certificatePem: str
     privateKey: str
 
@@ -33,7 +32,6 @@ logger = logging.getLogger()
 USER = os.environ['coioteDMrestUsername']
 PASSWORD = os.environ['coioteDMrestPassword']
 REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
-GROUP_ID = os.environ['coioteDMrestGroupId']
 
 CERT_SECRET_NAME = 'coioteDMcert'
 CERT_DATA_SECRET_NAME = 'coioteDMcertData'
@@ -47,15 +45,13 @@ def log_success(msg: str):
 def create(event, context):
     external_certificate = iot_client.create_keys_and_certificate(setAsActive=True)
     log_success("Certificate created in IoT Core.")
+    cert_policy = event['ResourceProperties']['PolicyName']
+    iot_client.attach_principal_policy(policyName=cert_policy, principal=external_certificate['certificateArn'])
 
     user_auth_cert = generate_external_cert(email_address=USER, common_name=USER)
-    ca_result = requests.get('https://www.amazontrust.com/repository/AmazonRootCA1.pem')
-    ca_result.raise_for_status()
-
-    external_cert_ca = ca_result.content.decode('UTF-8')
 
     save_external_certificate_data(external_certificate)
-    send_external_certificate(external_certificate, external_cert_ca)
+    send_external_certificate(external_certificate)
     send_user_auth_cert(user_auth_cert)
     save_certificate_in_secrets_manager(user_auth_cert)
 
@@ -90,14 +86,13 @@ def generate_external_cert(email_address: str, common_name: str, serial_number=0
     }
 
 
-def send_external_certificate(internal_certificate, internal_cert_ca):
+def send_external_certificate(internal_certificate):
     request_body: ExternalCertificateRequestBody = {
-        'certificateAuthority': internal_cert_ca,
         'certificatePem': internal_certificate['certificatePem'],
         'privateKey': internal_certificate['keyPair']['PrivateKey']
     }
-    uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
-    requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate'
+    requests.post(uri, json=request_body, auth=(USER, PASSWORD), verify=False).raise_for_status()
     log_success("IoT Core certificate saved in CoioteDM.")
 
 
@@ -113,7 +108,7 @@ def send_user_auth_cert(external_certificate: Certificate):
         'certificatePem': external_certificate['certificatePem']
     }
     uri = REST_URI + '/auth/certificates'
-    requests.post(uri, json=request_body, auth=(USER, PASSWORD)).raise_for_status()
+    requests.post(uri, json=request_body, auth=(USER, PASSWORD), verify=False).raise_for_status()
     log_success("User authentication certificate saved in CoioteDM.")
 
 
@@ -138,9 +133,9 @@ def delete(event, context):
 
 
 def delete_external_certificate_from_coiote() -> bool:
-    uri = REST_URI + '/awsIntegration/auth/externalCertificate/' + GROUP_ID
+    uri = REST_URI + '/awsIntegration/auth/externalCertificate'
     try:
-        requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
+        requests.delete(uri, auth=(USER, PASSWORD), verify=False).raise_for_status()
     except HTTPError as e:
         logger.error(e)
         return False
@@ -156,14 +151,11 @@ def delete_external_certificate_from_aws() -> bool:
 
         try:
             iot_client.update_certificate(certificateId=secret_string, newStatus='INACTIVE')
-            iot_client.delete_certificate(certificateId=secret_string)
+            iot_client.delete_certificate(certificateId=secret_string, forceDelete=True)
         except iot_client.exceptions.ResourceNotFoundException:
             logger.warning("Certificate not found in IoT Core, it could have been removed manually.")
-
-        try:
+        finally:
             secrets_manager_client.delete_secret(SecretId=CERT_DATA_SECRET_NAME, ForceDeleteWithoutRecovery=True)
-        except secrets_manager_client.exceptions.ResourceNotFoundException:
-            pass
 
     except secrets_manager_client.exceptions.ResourceNotFoundException as e:
         logger.error(
@@ -184,7 +176,7 @@ def delete_user_auth_cert_from_coiote() -> bool:
     uri = REST_URI + '/auth/certificates/'
 
     try:
-        requests.delete(uri, auth=(USER, PASSWORD)).raise_for_status()
+        requests.delete(uri, auth=(USER, PASSWORD), verify=False).raise_for_status()
     except HTTPError as e:
         logger.error(e)
         return False

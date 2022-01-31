@@ -1,60 +1,91 @@
 import json
-import requests
-import boto3
+import os
+from tempfile import NamedTemporaryFile
 from dataclasses import dataclass
+from typing import TypedDict
+
+import boto3
+import requests
+
+REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
+
+
+class OperationHttpStatus(TypedDict):
+    statusCode: int
+    body: str
+
+
+def operation_error(code: int, error: str) -> OperationHttpStatus:
+    return OperationHttpStatus(
+        statusCode=code,
+        body=json.dumps({
+            'error': error
+        })
+    )
+
+
+def get_certificate_files():
+    user_auth_cert = get_user_auth_cert()
+    certificate_pem = NamedTemporaryFile(delete=False)
+    private_key = NamedTemporaryFile(delete=False)
+    certificate_pem_file = certificate_pem.name
+    private_key_file = private_key.name
+    try:
+        certificate_pem.write(str.encode(user_auth_cert.certificatePem))
+        private_key.write(str.encode(user_auth_cert.privateKey))
+        certificate_pem.close()
+        private_key.close()
+        yield certificate_pem_file, private_key_file
+    finally:
+        os.unlink(certificate_pem_file)
+        os.unlink(private_key_file)
 
 
 @dataclass
-class CoioteCredentials:
-    url: str
-    username: str
-    password: str
+class UserAuthCert:
+    certificatePem: str
+    privateKey: str
 
 
-def getCoioteSecrets():
-    secretName = "coioteDMrest"
+def get_user_auth_cert() -> UserAuthCert:
+    secret_name = 'coioteDMcert'
 
     session = boto3.session.Session()
     client = session.client('secretsmanager')
 
     try:
-        getSecretValueResponse = client.get_secret_value(
-            SecretId=secretName
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
         )
     except Exception:
-        raise Exception('Coiote DM credentials not found in Secrets Manager')
+        raise Exception('Coiote DM certificate not found in Secrets Manager')
 
-    if 'SecretString' not in getSecretValueResponse:
-        raise Exception('Coiote DM credentials are not set up correctly')
+    if 'SecretString' not in get_secret_value_response:
+        raise Exception('Coiote DM certificate are not set up correctly')
 
-    secretsMap = json.JSONDecoder().decode(getSecretValueResponse['SecretString'])
+    secrets_map = json.JSONDecoder().decode(get_secret_value_response['SecretString'])
 
-    usernameKey = 'username'
-    passwordKey = 'password'
-    urlKey = 'url'
+    certificate_pem_key = 'certificatePem'
+    private_key_key = 'privateKey'
 
-    expectedKeysSet = {usernameKey, passwordKey, urlKey}
-    fetchedKeysSet = set(secretsMap.keys())
+    expected_keys_set = {certificate_pem_key, private_key_key}
+    fetched_keys_set = set(secrets_map.keys())
 
-    if expectedKeysSet.issubset(fetchedKeysSet):
-        return CoioteCredentials(
-            url=secretsMap[urlKey],
-            username=secretsMap[usernameKey],
-            password=secretsMap[passwordKey]
+    if expected_keys_set.issubset(fetched_keys_set):
+        return UserAuthCert(
+            certificatePem=secrets_map[certificate_pem_key],
+            privateKey=secrets_map[private_key_key],
         )
     else:
-        raise Exception(f'Secret in Secrets Manager does not have all required keys ({", ".join(expectedKeysSet)})')
+        raise Exception(f'Secret in Secrets Manager does not have all required keys ({", ".join(expected_keys_set)})')
 
 
 def lambda_handler(event, context):
     if 'keys' not in event:
-        #Results of print functions are logged in CloudWatch when debugging is enabled
-        #Results of return seem to be not logged there
+        # Results of print functions are logged in CloudWatch when debugging is enabled
+        # Results of return seem to be not logged there
         print('Error: keys must be specified')
-        return {
-            'statusCode': 400,
-            'body': '{"error":"keys must be specified"}'
-        }
+        return operation_error(400, 'keys must be specified')
     else:
         keys = event['keys']
 
@@ -87,12 +118,9 @@ def lambda_handler(event, context):
             keysCsStr = ','.join(keys)
         return keysCsStr
 
-    if not 'operation' in event:
+    if 'operation' not in event:
         print('Error: operation must be specified')
-        return {
-            'statusCode': 400,
-            'body': '{"error":"operation must be specified"}'
-        }
+        return operation_error(400, 'operation must be specified')
     else:
         operation = event['operation']
         #print('Operation is '+operation)
@@ -104,39 +132,44 @@ def lambda_handler(event, context):
                 if key.endswith('.'):
                     keys[i] = key[:-1]
                 i+=1
+
             if len(keys) != len(set(keys)):
                 print('Error: keys must be unique for write operation')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"keys must be unique for write operation"}'
-                }
+                return operation_error(400, 'keys must be unique for write operation')
+
             if 'values' in event:
                 values = event['values']
                 if len(keys) != len(values):
                     print('Error: The number of keys must be equal to the number of values')
-                    return {
-                        'statusCode': 400,
-                        'body': '{"error":"The number of keys must be equal to the number of values"}'
-                    }
+                    return operation_error(400, 'The number of keys must be equal to the number of values')
             else:
                 print('Error: You must specify values when write operation is used')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"You must specify values when write operation is used"}'
-                }
-            keysCsStr = ','.join(keys)
-            #valuesCsStr = ','.join(values)
-            valuesCsStr = ','.join([str(x) for x in values])
-            body='{"templateName":"AWSwrite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"values","value":"'+valuesCsStr+'"}]}}'
+                return operation_error(400, 'You must specify values when write operation is used')
 
+            keysCsStr = ','.join(keys)
+            valuesCsStr = ','.join([str(x) for x in values])
+            body = {
+                'templateName': 'AWSwriteCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}, {'name': 'values', 'value': valuesCsStr}]
+                }
+            }
         elif operation == 'read':
             keysCsStr = pathsOptimization(keys)
-            body='{"templateName":"AWSread","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
-
+            body = {
+                'templateName': 'AWSreadCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}]
+                }
+            }
         elif operation == 'readComposite':
             keysCsStr = pathsOptimization(keys)
-            body='{"templateName":"AWSreadComposite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
-
+            body = {
+                'templateName': 'AWSreadCompositeCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}]
+                }
+            }
         elif operation == 'observe':
             i=0
             for key in keys:
@@ -145,25 +178,18 @@ def lambda_handler(event, context):
                 i+=1
             if len(keys) != len(set(keys)):
                 print('Error: keys must be unique for observe operation')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"keys must be unique for observe operation"}'
-                }
+                return operation_error(400, 'keys must be unique for observe operation')
+
             if 'attributes' in event:
                 attributes = event['attributes']
                 if len(keys) != len(attributes):
                     print('Error: The number of keys must be equal to the number of attributes')
-                    return {
-                        'statusCode': 400,
-                        'body': '{"error":"The number of keys must be equal to the number of attributes"}'
-                    }
+                    return operation_error(400, 'The number of keys must be equal to the number of attributes')
             else:
                 print('Error: You must specify attributes when observe operation is used')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"You must specify attributes when observe operation is used"}'
-                }
-            keysAttributesDict = dict(zip(keys,attributes))
+                return operation_error(400, 'You must specify attributes when observe operation is used')
+
+            keysAttributesDict = dict(zip(keys, attributes))
             attributes.clear()
             keys.sort()
             i=0
@@ -177,6 +203,7 @@ def lambda_handler(event, context):
                         jEnd-=1
                     j+=1
                 i+=1
+
             i=0
             for key in keys:
                 keys[i] = key[:-1]
@@ -184,33 +211,53 @@ def lambda_handler(event, context):
                 #keys[i] = key
                 attributes.append(keysAttributesDict[key])
                 i+=1
-            keysCsStr = ','.join(keys)
-            ###attributesCsStr = str(attributes)[1:-1].replace(" ","")
-            attributesStr = str(attributes).replace(" ","")
-            #keysCsStr = pathsOptimization(keys)
-            body='{"templateName":"AWSobserve","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"attributes","value":"'+attributesStr+'"}]}}'
 
+            keysCsStr = ','.join(keys)
+            ###attributesCsStr = str(attributes)[1:-1].replace(' ','')
+            attributesStr = str(attributes).replace(' ', '')
+            #keysCsStr = pathsOptimization(keys)
+            body = {
+                'templateName': 'AWSobserveCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}, {'name': 'attributes', 'value': attributesStr}]
+                }
+            }
         elif operation == 'observeComposite':
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
-            body='{"templateName":"AWSobserveComposite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
-
+            body = {
+                'templateName': 'AWSobserveCompositeCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}]
+                }
+            }
         elif operation == 'execute':
             if len(keys) != 1:
                 print('Error: Only one LwM2M path can be passed for execute operation - keys array must contain only one element')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"Only one LwM2M path can be passed for execute operation - keys array must contain only one element"}'
+                return operation_error(400, 'Only one LwM2M path can be passed for execute operation - keys array must contain only one element')
+            if 'arguments' not in event:
+                body = {
+                    'templateName': 'AWSexecuteCertAuth',
+                    'config': {
+                        'parameters': [{'name': 'keys', 'value': keys[0]}]
+                    }
                 }
-            if not 'arguments' in event:
-                body='{"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":"'+keys[0]+'"}]}}'
             else:
                 arguments = event['arguments']
                 if arguments is not None:
-                    body='{"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":"'+keys[0]+'"},{"name":"arguments","value":"'+arguments+'"}]}}'
+                    body = {
+                        'templateName': 'AWSexecuteCertAuth',
+                        'config': {
+                            'parameters': [{'name': 'keys', 'value': keys[0]}, {'name': 'arguments', 'value': arguments}]
+                        }
+                    }
                 else:
-                    body='{"templateName":"AWSexecute","config":{"parameters":[{"name":"keys","value":"'+keys[0]+'"}]}}'
-
+                    body = {
+                        'templateName': 'AWSexecuteCertAuth',
+                        'config': {
+                            'parameters': [{'name': 'keys', 'value': keys[0]}]
+                        }
+                    }
         elif operation == 'cancelObserve':
             # even if there are other keys in 'keys', set it to be just 'all' if 'keys' contains 'all'
             if 'all' in keys:
@@ -218,13 +265,22 @@ def lambda_handler(event, context):
             else:
                 keys = list(set(keys))
                 keysCsStr = ','.join(keys)
-            body='{"templateName":"AWScancelObserve","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
 
+            body = {
+                'templateName': 'AWScancelObserveCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}]
+                }
+            }
         elif operation == 'cancelObserveComposite':
             keys = list(set(keys))
             keysCsStr = ','.join(keys)
-            body='{"templateName":"AWScancelObserveComposite","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"}]}}'
-
+            body = {
+                'templateName': 'AWScancelObserveCompositeCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}]
+                }
+            }
         elif operation == 'writeAttributes':
             i=0
             for key in keys:
@@ -233,76 +289,64 @@ def lambda_handler(event, context):
                 i+=1
             if len(keys) != len(set(keys)):
                 print('Error: keys must be unique for writeAttributes operation')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"keys must be unique for writeAttributes operation"}'
-                }
+                return operation_error(400, 'keys must be unique for writeAttributes operation')
             if 'attributes' in event:
                 attributes = event['attributes']
                 if len(keys) != len(attributes):
                     print('Error: The number of keys must be equal to the number of attributes')
-                    return {
-                        'statusCode': 400,
-                        'body': '{"error":"The number of keys must be equal to the number of attributes"}'
-                    }
+                    return operation_error(400, 'The number of keys must be equal to the number of attributes')
             else:
                 print('Error: You must specify attributes when writeAttributes operation is used')
-                return {
-                    'statusCode': 400,
-                    'body': '{"error":"You must specify attributes when writeAttributes operation is used"}'
-                }
+                return operation_error(400, 'You must specify attributes when writeAttributes operation is used')
             i=0
             for key in keys:
                 keys[i] = key[:-1]
 
                 i+=1
             keysCsStr = ','.join(keys)
-            attributesStr = str(attributes).replace(" ","").replace("None","''")
-            body='{"templateName":"AWSwriteAttributes","config":{"parameters":[{"name":"keys","value":"'+keysCsStr+'"},{"name":"attributes","value":"'+attributesStr+'"}]}}'
-
+            attributesStr = str(attributes).replace(' ', '').replace('None', "''")
+            body = {
+                'templateName': 'AWSwriteAttributesCertAuth',
+                'config': {
+                    'parameters': [{'name': 'keys', 'value': keysCsStr}, {'name': 'attributes', 'value': attributesStr}]
+                }
+            }
         else:
-            print('Error: operation '+operation+' is not implemented for AWS-CoioteDM integration')
-            return {
-                'statusCode': 406,
-                'body': '{"error":"operation '+operation+' is not implemented for AWS-CoioteDM integration"}'
-            }
+            print(f'Error: operation {operation} is not implemented for AWS-CoioteDM integration')
+            return operation_error(406, f'operation {operation} is not implemented for AWS-CoioteDM integration')
 
-        try:
-            credentials = getCoioteSecrets()
-        except Exception as ex:
-            print('Error: ' + str(ex))
-            return {
-                'statusCode': 400,
-                'body': '{"error":"' + str(ex) + '"}'
-            }
-        #uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/deviceBlocking/'+thingName
-        """
-        in this approach, the task is scheduled at Coiote - and then we are performing 2nd call to trigger session even if a device is deregistered
-        as the task has exec condition that it is executed only when the device is registered
-        below resolved by 2nd exec condition - if a device is in queue mode, the task is executed once the device comes with some LwM2M message:
-        we can also add an optional parameter in the shadow to wait for a device (by default set to false) and in this case not performing 2nd call triggering session
-        If instead these 2 the method commented above is used, Coiote will respond with error indicating that the device is deregistered and the task will not be scheduled at all
-        """
-        uri = credentials.url+'/api/coiotedm/v3/tasksFromTemplates/device/'+thingName
-        headers = {'Content-Type':'application/json'}
-        apiCallResp = requests.post(uri, data=body, headers=headers, auth=(credentials.username, credentials.password))
-        qjResponseCode = apiCallResp.status_code
-        qjResponseBody = apiCallResp.text
-        if qjResponseCode != 201:
-            print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
-            return {
-                'statusCode': qjResponseCode,
-                'body': qjResponseBody
-            }
+        # uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/deviceBlocking/'+thingName
 
-        uri = credentials.url+'/api/coiotedm/v3/sessions/'+thingName+'/allow-deregistered'
-        apiCallResp = requests.post(uri, auth=(credentials.username, credentials.password))
-        qjResponseCode = apiCallResp.status_code
-        qjResponseBody = apiCallResp.text
-        if qjResponseCode != 200:
-            print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+        # in this approach, the task is scheduled at Coiote - and then
+        # we are performing 2nd call to trigger session even if a device is deregistered
+        # as the task has exec condition that it is executed only when the device is registered
+        # below resolved by 2nd exec condition - if a device is in queue mode,
+        # the task is executed once the device comes with some LwM2M message:
+        # we can also add an optional parameter in the shadow to wait for a device (by default set to false)
+        # and in this case not performing 2nd call triggering session
+        # If instead these 2 the method commented above is used, Coiote will respond with
+        # error indicating that the device is deregistered and the task will not be scheduled at all
+        for certificate, private_key in get_certificate_files():
+            uri = REST_URI+'/tasksFromTemplates/device/'+thingName
+            headers = {'Authorization': 'Certificate'}
+            apiCallResp = requests.post(uri, json=body, headers=headers, cert=(certificate, private_key), verify=False, timeout=10)
+            qjResponseCode = apiCallResp.status_code
+            qjResponseBody = apiCallResp.text
+            if qjResponseCode != 201:
+                print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+                return OperationHttpStatus(
+                    statusCode=qjResponseCode,
+                    body=qjResponseBody
+                )
 
-        return {
-            'statusCode': qjResponseCode,
-            'body': qjResponseBody
-        }
+            uri = REST_URI+'/sessions/'+thingName+'/allow-deregistered'
+            apiCallResp = requests.post(uri, headers=headers, cert=(certificate, private_key), verify=False, timeout=10)
+            qjResponseCode = apiCallResp.status_code
+            qjResponseBody = apiCallResp.text
+            if qjResponseCode != 200:
+                print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+
+            return OperationHttpStatus(
+                statusCode=qjResponseCode,
+                body=qjResponseBody
+            )
