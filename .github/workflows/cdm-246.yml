@@ -23,6 +23,9 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./coiote-aws-iot-cloud-formation
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -36,9 +39,6 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::039321617281:role/github-avsystem
           aws-region: eu-central-1
-
-      - name: Go to cloud-formation dir
-        run: cd coiote-aws-iot-cloud-formation
 
       - name: Install lambdas requirements
         run: find . -name requirements.txt -print0 | xargs -0 -n1 dirname | xargs -I '{}' pip install -r {}/requirements.txt --target {}
