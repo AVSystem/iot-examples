@@ -50,4 +50,4 @@ jobs:
         run: aws cloudformation package --template-file cloudFormation.json --s3-bucket coiote-aws-integration --output-template-file coiote-aws-integration-cf-template.json --use-json
 
       - name: Upload template to S3
-        run: aws s3 cp coiote-aws-integration-cf-template.json s3://coiote-aws-integration/coiote-aws-integration-cf-template.json
+        run: aws s3 cp --acl authenticated-read coiote-aws-integration-cf-template.json s3://coiote-aws-integration/coiote-aws-integration-cf-template.json
