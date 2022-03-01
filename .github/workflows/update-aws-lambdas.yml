@@ -2,9 +2,9 @@ name: Update lambdas for AWS integrations
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the CDM-246
   push:
-    branches: [ CDM-246 ]
+    branches: [ main ]
+    # the job will be triggered only on change in given folder on main branch
     paths:
       - coiote-aws-iot-cloud-formation/**
 
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   # This workflow contains a single job called "build"
-  run:
+  update-aws-lambdas:
     # The type of runner that the job will run on
     runs-on: ubuntu-20.04
     defaults:
