@@ -44,7 +44,7 @@ jobs:
         run: find . -name requirements.txt -print0 | xargs -0 -n1 dirname | xargs -I '{}' pip install -r {}/requirements.txt --target {}
 
       - name: Clean bucket before upload
-        run: aws s3 rm s3://bucket-name --recursive
+        run: aws s3 rm s3://coiote-aws-integration --recursive
 
       - name: Build and upload lambdas
         run: aws cloudformation package --template-file cloudFormation.json --s3-bucket coiote-aws-integration --output-template-file coiote-aws-integration-cf-template.json --use-json
