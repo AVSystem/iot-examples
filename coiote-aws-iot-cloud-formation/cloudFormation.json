@@ -209,6 +209,110 @@
         }
       }
     },
+    "CreateLambdasRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "CloudWatchForCreateLambdaPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:PutLogEvents",
+                    "logs:CreateLogStream"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      ":", [
+                        "arn",
+                        "aws",
+                        "logs",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "log-group",
+                        "/AWSIotLogsV2/*"
+                      ]
+                    ]
+                  },
+                  "Effect": "Allow"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "IoTForCreateLambdaPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "iot:CreateThingType",
+                    "iot:CreateThing",
+                    "iot:ListThingTypes"
+                  ],
+                  "Resource": "*",
+                  "Effect": "Allow"
+                }
+              ]
+            }
+          }
+        ],
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ]
+      }
+    },
+    "CreateThingTypeLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": "createThingType/",
+        "FunctionName": "CreateThingType",
+        "Handler": "create_thing_type.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "CreateLambdasRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "python3.8",
+        "Timeout": 60
+      }
+    },
+    "CreateThingLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": "createThing/",
+        "FunctionName": "CreateThing",
+        "Handler": "create_thing.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "CreateLambdasRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "python3.8",
+        "Timeout": 60
+      }
+    },
     "LambdaInvocationPermission": {
       "Type": "AWS::Lambda::Permission",
       "Properties": {
@@ -226,6 +330,50 @@
         "SourceArn": {
           "Fn::GetAtt": [
             "OperationRequestRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "CreateThingTypeLambdaInvocationPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "CreateThingTypeLambda",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "iot.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "CreateThingTypeRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "CreateThingLambdaInvocationPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "CreateThingLambda",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "iot.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "CreateThingRule",
             "Arn"
           ]
         }
@@ -293,6 +441,126 @@
               "RoleArn": {
                 "Fn::GetAtt": [
                   "IamForOperationResponse",
+                  "Arn"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "IamForCreateRules": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "iot.amazonaws.com"
+              },
+              "Effect": "Allow"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CreateRulesCloudWatch",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "AllowErrorOrMessageLogWriting",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents",
+                    "logs:CreateLogStream"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      ":", [
+                        "arn",
+                        "aws",
+                        "logs",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "log-group",
+                        "/AWSIotLogsV2/*"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CreateThingTypeRule": {
+      "Type": "AWS::IoT::TopicRule",
+      "Properties": {
+        "RuleName": "CreateThingType",
+        "TopicRulePayload": {
+          "Description": "This rule handles creation of a new thing type",
+          "AwsIotSqlVersion": "2016-03-23",
+          "Sql": "SELECT * FROM 'createThingType'",
+          "Actions": [
+            {
+              "Lambda": {
+                "FunctionArn": {
+                  "Fn::GetAtt": [
+                    "CreateThingTypeLambda",
+                    "Arn"
+                  ]
+                }
+              }
+            }
+          ],
+          "ErrorAction": {
+            "CloudwatchLogs": {
+              "LogGroupName": "AWSIotLogsV2",
+              "RoleArn": {
+                "Fn::GetAtt": [
+                  "IamForCreateRules",
+                  "Arn"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "CreateThingRule": {
+      "Type": "AWS::IoT::TopicRule",
+      "Properties": {
+        "RuleName": "CreateThing",
+        "TopicRulePayload": {
+          "Description": "This rule handles creation of a new thing",
+          "AwsIotSqlVersion": "2016-03-23",
+          "Sql": "SELECT * FROM 'createThing'",
+          "Actions": [
+            {
+              "Lambda": {
+                "FunctionArn": {
+                  "Fn::GetAtt": [
+                    "CreateThingLambda",
+                    "Arn"
+                  ]
+                }
+              }
+            }
+          ],
+          "ErrorAction": {
+            "CloudwatchLogs": {
+              "LogGroupName": "AWSIotLogsV2",
+              "RoleArn": {
+                "Fn::GetAtt": [
+                  "IamForCreateRules",
                   "Arn"
                 ]
               }
