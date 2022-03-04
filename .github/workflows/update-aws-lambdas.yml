@@ -1,0 +1,55 @@
+name: Update lambdas for AWS integrations
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ main ]
+    # the job will be triggered only on change in given folder on main branch
+    paths:
+      - coiote-aws-iot-cloud-formation/**
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read    # This is required for actions/checkout@v2
+
+jobs:
+  # This workflow contains a single job called "build"
+  update-aws-lambdas:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        working-directory: ./coiote-aws-iot-cloud-formation
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::039321617281:role/github-avsystem
+          aws-region: eu-central-1
+
+      - name: Install lambdas requirements
+        run: find . -name requirements.txt -print0 | xargs -0 -n1 dirname | xargs -I '{}' pip install -r {}/requirements.txt --target {}
+
+      - name: Clean bucket before upload
+        run: aws s3 rm s3://coiote-aws-integration --recursive
+
+      - name: Build and upload lambdas
+        run: aws cloudformation package --template-file cloudFormation.json --s3-bucket coiote-aws-integration --output-template-file coiote-aws-integration-cf-template.json --use-json
+
+      - name: Upload template to S3
+        run: aws s3 cp coiote-aws-integration-cf-template.json s3://coiote-aws-integration/coiote-aws-integration-cf-template.json
+
+      - name: Allow authenticated AWS accounts to read uploaded objects
+        run: aws s3 ls coiote-aws-integration | awk '{print $4}' | xargs -I {} aws s3api put-object-acl --acl authenticated-read --bucket coiote-aws-integration --key {}
