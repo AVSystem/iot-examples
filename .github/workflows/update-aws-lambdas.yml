@@ -42,14 +42,34 @@ jobs:
       - name: Install lambdas requirements
         run: find . -name requirements.txt -print0 | xargs -0 -n1 dirname | xargs -I '{}' pip install -r {}/requirements.txt --target {}
 
-      - name: Clean bucket before upload
-        run: aws s3 rm s3://coiote-aws-integration --recursive
+      - name: Package and upload lambdas
+        run: |
+          for REGION in \
+            eu-central-1 \
+            eu-north-1   \
+            eu-west-1    \
+            eu-west-2    \
+            eu-west-3    \
+            us-east-1    \
+            us-east-2    \
+            us-west-1    \
+            us-west-2
+          do
+            BUCKET_NAME=coiote-aws-int-$REGION
 
-      - name: Build and upload lambdas
-        run: aws cloudformation package --template-file cloudFormation.json --s3-bucket coiote-aws-integration --output-template-file coiote-aws-integration-cf-template.json --use-json
+            echo Processing bucket $BUCKET_NAME
+            echo '    Cleaning the bucket before upload'
+            aws s3 rm s3://$BUCKET_NAME --recursive
 
-      - name: Upload template to S3
-        run: aws s3 cp coiote-aws-integration-cf-template.json s3://coiote-aws-integration/coiote-aws-integration-cf-template.json
+            echo '    Building and uploading lambdas'
+            aws cloudformation package --template-file cloudFormation.json --s3-bucket $BUCKET_NAME --output-template-file coiote-aws-integration-cf-template.json --use-json
 
-      - name: Allow authenticated AWS accounts to read uploaded objects
-        run: aws s3 ls coiote-aws-integration | awk '{print $4}' | xargs -I {} aws s3api put-object-acl --acl authenticated-read --bucket coiote-aws-integration --key {}
+            echo '    Uploading template to S3'
+            aws s3 cp coiote-aws-integration-cf-template.json s3://$BUCKET_NAME/coiote-aws-integration-cf-template.json
+
+            echo '    Removing local copy of the template'
+            rm coiote-aws-integration-cf-template.json
+
+            echo '    Allowing authenticated AWS accounts to read uploaded objects'
+            aws s3 ls $BUCKET_NAME | awk '{print $4}' | xargs -I {} aws s3api put-object-acl --acl authenticated-read --bucket $BUCKET_NAME --key {}
+          done
