@@ -11,4 +11,4 @@ def lambda_handler(event, context):
     existing_thing_types = client.list_thing_types()['thingTypes']
     existing_thing_types_names = [thing['thingTypeName'] for thing in existing_thing_types]
     if thing_type not in existing_thing_types_names:
-        client.create_thing_type(thing_type)
+        client.create_thing_type(thingTypeName=thing_type)
