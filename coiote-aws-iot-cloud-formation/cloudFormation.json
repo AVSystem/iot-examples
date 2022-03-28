@@ -265,9 +265,10 @@
               "Statement": [
                 {
                   "Action": [
+                    "iot:ListThingTypes",
                     "iot:CreateThingType",
                     "iot:CreateThing",
-                    "iot:ListThingTypes"
+                    "iot:UpdateThingShadow"
                   ],
                   "Resource": "*",
                   "Effect": "Allow"
@@ -279,22 +280,6 @@
         "ManagedPolicyArns": [
           "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
         ]
-      }
-    },
-    "CreateThingTypeLambda": {
-      "Type": "AWS::Lambda::Function",
-      "Properties": {
-        "Code": "createThingType/",
-        "FunctionName": "CreateThingType",
-        "Handler": "create_thing_type.lambda_handler",
-        "Role": {
-          "Fn::GetAtt": [
-            "CreateLambdasRole",
-            "Arn"
-          ]
-        },
-        "Runtime": "python3.8",
-        "Timeout": 60
       }
     },
     "CreateThingLambda": {
@@ -330,28 +315,6 @@
         "SourceArn": {
           "Fn::GetAtt": [
             "OperationRequestRule",
-            "Arn"
-          ]
-        }
-      }
-    },
-    "CreateThingTypeLambdaInvocationPermission": {
-      "Type": "AWS::Lambda::Permission",
-      "Properties": {
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "CreateThingTypeLambda",
-            "Arn"
-          ]
-        },
-        "Action": "lambda:InvokeFunction",
-        "Principal": "iot.amazonaws.com",
-        "SourceAccount": {
-          "Ref": "AWS::AccountId"
-        },
-        "SourceArn": {
-          "Fn::GetAtt": [
-            "CreateThingTypeRule",
             "Arn"
           ]
         }
@@ -499,40 +462,6 @@
             }
           }
         ]
-      }
-    },
-    "CreateThingTypeRule": {
-      "Type": "AWS::IoT::TopicRule",
-      "Properties": {
-        "RuleName": "CreateThingType",
-        "TopicRulePayload": {
-          "Description": "This rule handles creation of a new thing type",
-          "AwsIotSqlVersion": "2016-03-23",
-          "Sql": "SELECT * FROM 'createThingType'",
-          "Actions": [
-            {
-              "Lambda": {
-                "FunctionArn": {
-                  "Fn::GetAtt": [
-                    "CreateThingTypeLambda",
-                    "Arn"
-                  ]
-                }
-              }
-            }
-          ],
-          "ErrorAction": {
-            "CloudwatchLogs": {
-              "LogGroupName": "AWSIotLogsV2",
-              "RoleArn": {
-                "Fn::GetAtt": [
-                  "IamForCreateRules",
-                  "Arn"
-                ]
-              }
-            }
-          }
-        }
       }
     },
     "CreateThingRule": {
