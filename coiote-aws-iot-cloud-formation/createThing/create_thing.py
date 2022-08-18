@@ -13,7 +13,7 @@ def ensure_thing_type_exists(thing_type):
 
 
 def lambda_handler(event, context):
-    thing_name = event['coioteDeviceId']
+    thing_name = event['coioteDeviceId'].replace('%3A', ':')
     thing_type_name = event['coioteDeviceType'].replace('.', ':')
     ensure_thing_type_exists(thing_type_name)
     attribute_payload = {
