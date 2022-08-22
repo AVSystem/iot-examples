@@ -713,7 +713,7 @@
   },
   "Parameters":{
     "coioteDMrestUri": {
-      "Description": "Coiote DM REST URL - ex. https://lwm2m-test.avsystem.io:8087",
+      "Description": "Coiote DM REST URL - ex. https://eu.iot.avsystem.cloud:8088",
       "Type": "String"
     },
     "coioteDMrestPassword": {
