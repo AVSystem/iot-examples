@@ -152,8 +152,7 @@ def lambda_handler(event, context):
             if 'values' in event:
                 values = event['values']
                 if len(keys) != len(values):
-                    print(
-                        'Error: The number of keys must be equal to the number of values')
+                    print('Error: The number of keys must be equal to the number of values')
                     return operation_error(400, 'The number of keys must be equal to the number of values')
             else:
                 print('Error: You must specify values when write operation is used')
