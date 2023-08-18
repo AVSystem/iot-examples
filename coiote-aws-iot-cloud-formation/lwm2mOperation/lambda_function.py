@@ -63,8 +63,7 @@ def get_user_auth_cert() -> UserAuthCert:
     if 'SecretString' not in get_secret_value_response:
         raise Exception('Coiote DM certificate are not set up correctly')
 
-    secrets_map = json.JSONDecoder().decode(
-        get_secret_value_response['SecretString'])
+    secrets_map = json.JSONDecoder().decode(get_secret_value_response['SecretString'])
 
     certificate_pem_key = 'certificatePem'
     private_key_key = 'privateKey'
@@ -221,15 +220,11 @@ def lambda_handler(event, context):
             i = 0
             for key in keys:
                 keys[i] = key[:-1]
-                # key = key[:-1]
-                # keys[i] = key
                 attributes.append(keysAttributesDict[key])
                 i += 1
 
             keysCsStr = ','.join(keys)
-            # attributesCsStr = str(attributes)[1:-1].replace(' ','')
             attributesStr = str(attributes).replace(' ', '')
-            # keysCsStr = pathsOptimization(keys)
             body = {
                 'templateName': 'AWSobserveCertAuth',
                 'config': {
@@ -330,8 +325,7 @@ def lambda_handler(event, context):
                 }
             }
         else:
-            print(
-                f'Error: operation {operation} is not implemented for AWS-CoioteDM integration')
+            print(f'Error: operation {operation} is not implemented for AWS-CoioteDM integration')
             return operation_error(406, f'operation {operation} is not implemented for AWS-CoioteDM integration')
 
         # in this approach, the task is scheduled at Coiote - and then
