@@ -77,7 +77,19 @@ def get_user_auth_cert() -> UserAuthCert:
             privateKey=secrets_map[private_key_key],
         )
     else:
-        raise Exception(f'Secret in Secrets Manager does not have all required keys ({", ".join(expected_keys_set)})')
+        raise Exception(
+            f'Secret in Secrets Manager does not have all required keys ({", ".join(expected_keys_set)})')
+
+
+def get_device_db_id(endpoint_name, certificate, private_key):
+    uri = REST_URI + "/devices"
+    condition = f"properties.endpointName eq '{endpoint_name}'"
+    params = {
+        "searchCriteria": condition
+    }
+    response = requests.get(uri, params=params, cert=(
+        certificate, private_key), verify=False)
+    return response.json()[0]
 
 
 def lambda_handler(event, context):
@@ -90,31 +102,31 @@ def lambda_handler(event, context):
         keys = event['keys']
 
     def pathsOptimization(keys):
-        if any(element in keys for element in ('all','','.','/')):
-            keysCsStr=''
+        if any(element in keys for element in ('all', '', '.', '/')):
+            keysCsStr = ''
         else:
-            i=0
+            i = 0
             for key in keys:
                 if not key.endswith('.'):
                     keys[i] = key+'.'
-                i+=1
+                i += 1
             keys = list(set(keys))
             keys.sort()
-            i=0
-            jEnd=len(keys)
+            i = 0
+            jEnd = len(keys)
             for key in keys:
-                j=i+1
+                j = i+1
                 while j < jEnd:
                     if keys[j].startswith(key):
                         del keys[j]
-                        j-=1
-                        jEnd-=1
-                    j+=1
-                i+=1
-            i=0
+                        j -= 1
+                        jEnd -= 1
+                    j += 1
+                i += 1
+            i = 0
             for key in keys:
                 keys[i] = key[:-1]
-                i+=1
+                i += 1
             keysCsStr = ','.join(keys)
         return keysCsStr
 
@@ -123,15 +135,14 @@ def lambda_handler(event, context):
         return operation_error(400, 'operation must be specified')
     else:
         operation = event['operation']
-        #print('Operation is '+operation)
         thingName = event['thingName']
 
         if operation == 'write':
-            i=0
+            i = 0
             for key in keys:
                 if key.endswith('.'):
                     keys[i] = key[:-1]
-                i+=1
+                i += 1
 
             if len(keys) != len(set(keys)):
                 print('Error: keys must be unique for write operation')
@@ -171,11 +182,11 @@ def lambda_handler(event, context):
                 }
             }
         elif operation == 'observe':
-            i=0
+            i = 0
             for key in keys:
                 if not key.endswith('.'):
                     keys[i] = key+'.'
-                i+=1
+                i += 1
             if len(keys) != len(set(keys)):
                 print('Error: keys must be unique for observe operation')
                 return operation_error(400, 'keys must be unique for observe operation')
@@ -183,39 +194,37 @@ def lambda_handler(event, context):
             if 'attributes' in event:
                 attributes = event['attributes']
                 if len(keys) != len(attributes):
-                    print('Error: The number of keys must be equal to the number of attributes')
+                    print(
+                        'Error: The number of keys must be equal to the number of attributes')
                     return operation_error(400, 'The number of keys must be equal to the number of attributes')
             else:
-                print('Error: You must specify attributes when observe operation is used')
+                print(
+                    'Error: You must specify attributes when observe operation is used')
                 return operation_error(400, 'You must specify attributes when observe operation is used')
 
             keysAttributesDict = dict(zip(keys, attributes))
             attributes.clear()
             keys.sort()
-            i=0
-            jEnd=len(keys)
+            i = 0
+            jEnd = len(keys)
             for key in keys:
-                j=i+1
+                j = i+1
                 while j < jEnd:
                     if keys[j].startswith(key):
                         del keys[j]
-                        j-=1
-                        jEnd-=1
-                    j+=1
-                i+=1
+                        j -= 1
+                        jEnd -= 1
+                    j += 1
+                i += 1
 
-            i=0
+            i = 0
             for key in keys:
                 keys[i] = key[:-1]
-                #key = key[:-1]
-                #keys[i] = key
                 attributes.append(keysAttributesDict[key])
-                i+=1
+                i += 1
 
             keysCsStr = ','.join(keys)
-            ###attributesCsStr = str(attributes)[1:-1].replace(' ','')
             attributesStr = str(attributes).replace(' ', '')
-            #keysCsStr = pathsOptimization(keys)
             body = {
                 'templateName': 'AWSobserveCertAuth',
                 'config': {
@@ -233,7 +242,8 @@ def lambda_handler(event, context):
             }
         elif operation == 'execute':
             if len(keys) != 1:
-                print('Error: Only one LwM2M path can be passed for execute operation - keys array must contain only one element')
+                print(
+                    'Error: Only one LwM2M path can be passed for execute operation - keys array must contain only one element')
                 return operation_error(400, 'Only one LwM2M path can be passed for execute operation - keys array must contain only one element')
             if 'arguments' not in event:
                 body = {
@@ -282,29 +292,32 @@ def lambda_handler(event, context):
                 }
             }
         elif operation == 'writeAttributes':
-            i=0
+            i = 0
             for key in keys:
                 if not key.endswith('.'):
                     keys[i] = key+'.'
-                i+=1
+                i += 1
             if len(keys) != len(set(keys)):
                 print('Error: keys must be unique for writeAttributes operation')
                 return operation_error(400, 'keys must be unique for writeAttributes operation')
             if 'attributes' in event:
                 attributes = event['attributes']
                 if len(keys) != len(attributes):
-                    print('Error: The number of keys must be equal to the number of attributes')
+                    print(
+                        'Error: The number of keys must be equal to the number of attributes')
                     return operation_error(400, 'The number of keys must be equal to the number of attributes')
             else:
-                print('Error: You must specify attributes when writeAttributes operation is used')
+                print(
+                    'Error: You must specify attributes when writeAttributes operation is used')
                 return operation_error(400, 'You must specify attributes when writeAttributes operation is used')
-            i=0
+            i = 0
             for key in keys:
                 keys[i] = key[:-1]
 
-                i+=1
+                i += 1
             keysCsStr = ','.join(keys)
-            attributesStr = str(attributes).replace(' ', '').replace('None', "''")
+            attributesStr = str(attributes).replace(
+                ' ', '').replace('None', "''")
             body = {
                 'templateName': 'AWSwriteAttributesCertAuth',
                 'config': {
@@ -314,8 +327,6 @@ def lambda_handler(event, context):
         else:
             print(f'Error: operation {operation} is not implemented for AWS-CoioteDM integration')
             return operation_error(406, f'operation {operation} is not implemented for AWS-CoioteDM integration')
-
-        # uri=restUri+'/api/coiotedm/v3/tasksFromTemplates/deviceBlocking/'+thingName
 
         # in this approach, the task is scheduled at Coiote - and then
         # we are performing 2nd call to trigger session even if a device is deregistered
@@ -327,24 +338,29 @@ def lambda_handler(event, context):
         # If instead these 2 the method commented above is used, Coiote will respond with
         # error indicating that the device is deregistered and the task will not be scheduled at all
         for certificate, private_key in get_certificate_files():
-            uri = REST_URI+'/tasksFromTemplates/device/'+thingName
+            device_id = get_device_db_id(thingName, certificate, private_key)
+            uri = REST_URI+'/tasksFromTemplates/device/'+device_id
             headers = {'Authorization': 'Certificate'}
-            apiCallResp = requests.post(uri, json=body, headers=headers, cert=(certificate, private_key), verify=False, timeout=10)
+            apiCallResp = requests.post(uri, json=body, headers=headers, cert=(
+                certificate, private_key), verify=False, timeout=10)
             qjResponseCode = apiCallResp.status_code
             qjResponseBody = apiCallResp.text
             if qjResponseCode != 201:
-                print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+                print('Error: Coiote DM responded with: ' +
+                      str(qjResponseCode) + ': ' + qjResponseBody)
                 return OperationHttpStatus(
                     statusCode=qjResponseCode,
                     body=qjResponseBody
                 )
 
-            uri = REST_URI+'/sessions/'+thingName+'/allow-deregistered'
-            apiCallResp = requests.post(uri, headers=headers, cert=(certificate, private_key), verify=False, timeout=10)
+            uri = REST_URI+'/sessions/'+device_id+'/allow-deregistered'
+            apiCallResp = requests.post(uri, headers=headers, cert=(
+                certificate, private_key), verify=False, timeout=10)
             qjResponseCode = apiCallResp.status_code
             qjResponseBody = apiCallResp.text
             if qjResponseCode != 200:
-                print('Error: Coiote DM responded with: ' + str(qjResponseCode) + ': ' + qjResponseBody)
+                print('Error: Coiote DM responded with: ' +
+                      str(qjResponseCode) + ': ' + qjResponseBody)
 
             return OperationHttpStatus(
                 statusCode=qjResponseCode,

@@ -7,8 +7,8 @@ Please check:
 
 https://iotdevzone.avsystem.com/docs/Azure_IoT_Integration_Guide/Tutorials/Air_quality_monitoring_tutorial.html 
 
-## Coiote AWS IoT Terraform
-A terraform that allows to deploy resources in AWS subscription, that are required to allow LPWAN (Lwm2m) devices connection to AWS IoT Core using Coiote DM Platform. 
-Please check: 
+## Coiote AWS IoT Terraform & CloudFormation config
+A Terraform & CloudFormation files that allow to deploy resources in AWS subscription, that are required to allow LPWAN (Lwm2m) devices connection to AWS IoT Core using Coiote DM Platform. 
 
-//TODO 
+
+Once you update the contents of CloudFormation integration, a [Github workflow](https://github.com/AVSystem/iot-examples/blob/main/.github/workflows/update-aws-lambdas.yml) will be executed to update the resources in AWS used by the integrating parties.
