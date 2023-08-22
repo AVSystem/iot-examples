@@ -40,7 +40,7 @@ jobs:
           aws-region: eu-central-1
 
       - name: Install lambdas requirements
-        run: find . -name requirements.txt -print0 | xargs -0 -n1 dirname | xargs -I '{}' pip install -r {}/requirements.txt --platform manylinux2014_x86_64 ---platform manylinux2014_x86_64 --only-binary=':all:' --target {}
+        run: find . -name requirements.txt -print0 | xargs -0 -n1 dirname | xargs -I '{}' pip install -r {}/requirements.txt --platform manylinux2014_x86_64 --only-binary=':all:' --target {}
 
       - name: Package and upload lambdas
         run: |
