@@ -8,6 +8,7 @@ import boto3
 import requests
 
 REST_URI = os.environ['coioteDMrestUri'] + '/api/coiotedm/v3'
+COIOTE_HEADERS = {'Authorization': 'Certificate'}
 
 
 class OperationHttpStatus(TypedDict):
@@ -87,7 +88,7 @@ def get_device_db_id(endpoint_name, certificate, private_key):
     params = {
         "searchCriteria": condition
     }
-    response = requests.get(uri, params=params, cert=(
+    response = requests.get(uri, headers=COIOTE_HEADERS, params=params, cert=(
         certificate, private_key), verify=False)
     return response.json()[0]
 
@@ -340,8 +341,7 @@ def lambda_handler(event, context):
         for certificate, private_key in get_certificate_files():
             device_id = get_device_db_id(thingName, certificate, private_key)
             uri = REST_URI+'/tasksFromTemplates/device/'+device_id
-            headers = {'Authorization': 'Certificate'}
-            apiCallResp = requests.post(uri, json=body, headers=headers, cert=(
+            apiCallResp = requests.post(uri, json=body, headers=COIOTE_HEADERS, cert=(
                 certificate, private_key), verify=False, timeout=10)
             qjResponseCode = apiCallResp.status_code
             qjResponseBody = apiCallResp.text
@@ -354,7 +354,7 @@ def lambda_handler(event, context):
                 )
 
             uri = REST_URI+'/sessions/'+device_id+'/allow-deregistered'
-            apiCallResp = requests.post(uri, headers=headers, cert=(
+            apiCallResp = requests.post(uri, headers=COIOTE_HEADERS, cert=(
                 certificate, private_key), verify=False, timeout=10)
             qjResponseCode = apiCallResp.status_code
             qjResponseBody = apiCallResp.text
