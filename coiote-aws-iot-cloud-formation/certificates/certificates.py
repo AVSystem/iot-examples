@@ -50,6 +50,10 @@ def create(event, context):
 
     user_auth_cert = generate_external_cert(email_address=USER, common_name=USER)
 
+    # clear potential old integration
+    delete_external_certificate_from_coiote()
+    delete_user_auth_cert_from_coiote()
+
     save_external_certificate_data(external_certificate)
     send_external_certificate(external_certificate)
     send_user_auth_cert(user_auth_cert)
